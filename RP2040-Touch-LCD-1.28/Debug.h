@@ -18,9 +18,9 @@
 
 #define DEV_DEBUG 1
 #if DEV_DEBUG
-  #define Debug(__info,...) printf("Debug : " __info,##__VA_ARGS__)
+#define Debug(__info, ...) printf("Debug : " __info, ##__VA_ARGS__)
 #else
-  #define DEBUG(__info,...)  
+#define DEBUG(__info, ...)
 #endif
 
 #endif

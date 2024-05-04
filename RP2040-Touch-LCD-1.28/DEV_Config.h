@@ -48,22 +48,22 @@
  * GPIOI config
  **/
 
-#define LCD_DC_PIN      (8)
-#define LCD_CS_PIN      (9)
-#define LCD_CLK_PIN     (10)
-#define LCD_MOSI_PIN    (11)
-#define LCD_MISO_PIN    (12)
-#define LCD_RST_PIN     (13)
-#define LCD_BL_PIN      (25)
+#define LCD_DC_PIN (8)
+#define LCD_CS_PIN (9)
+#define LCD_CLK_PIN (10)
+#define LCD_MOSI_PIN (11)
+#define LCD_MISO_PIN (12)
+#define LCD_RST_PIN (13)
+#define LCD_BL_PIN (25)
 
-#define DEV_SDA_PIN     (6)
-#define DEV_SCL_PIN     (7)
+#define DEV_SDA_PIN (6)
+#define DEV_SCL_PIN (7)
 
-#define Touch_INT_PIN   (21)
-#define Touch_RST_PIN   (22)
+#define Touch_INT_PIN (21)
+#define Touch_RST_PIN (22)
 
-#define BAT_ADC_PIN     (29)
-#define BAR_CHANNEL     (A3)
+#define BAT_ADC_PIN (29)
+#define BAR_CHANNEL (A3)
 
 /*------------------------------------------------------------------------------------------------------*/
 
@@ -85,10 +85,10 @@ void DEV_Delay_us(uint32_t xus);
 
 void DEV_I2C_Write_Byte(uint8_t addr, uint8_t reg, uint8_t Value);
 void DEV_I2C_Write_nByte(uint8_t addr, uint8_t *pData, uint32_t Len);
-void DEV_I2C_Write_Register(uint8_t addr,uint8_t reg, uint16_t value);
+void DEV_I2C_Write_Register(uint8_t addr, uint8_t reg, uint16_t value);
 
 uint8_t DEV_I2C_Read_Byte(uint8_t addr, uint8_t reg);
-void DEV_I2C_Read_Register(uint8_t addr,uint8_t reg, uint16_t *value);
+void DEV_I2C_Read_Register(uint8_t addr, uint8_t reg, uint16_t *value);
 void DEV_I2C_Read_nByte(uint8_t addr, uint8_t reg, uint8_t *pData, uint32_t Len);
 
 void DEV_SET_PWM(uint8_t Value);

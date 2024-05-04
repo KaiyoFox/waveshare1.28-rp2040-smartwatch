@@ -12,12 +12,12 @@
 *
 ******************************************************************************/
 #ifndef __LCD_1IN28_H
-#define __LCD_1IN28_H	
-	
+#define __LCD_1IN28_H
+
 #include "DEV_Config.h"
 #include <stdint.h>
 
-#include <stdlib.h>     //itoa()
+#include <stdlib.h>  //itoa()
 #include <stdio.h>
 
 
@@ -27,13 +27,13 @@
 
 
 #define HORIZONTAL 0
-#define VERTICAL   1
+#define VERTICAL 1
 
-typedef struct{
-	UWORD WIDTH;
-	UWORD HEIGHT;
-	UBYTE SCAN_DIR;
-}LCD_1IN28_ATTRIBUTES;
+typedef struct {
+  UWORD WIDTH;
+  UWORD HEIGHT;
+  UBYTE SCAN_DIR;
+} LCD_1IN28_ATTRIBUTES;
 extern LCD_1IN28_ATTRIBUTES LCD_1IN28;
 
 /********************************************************************************

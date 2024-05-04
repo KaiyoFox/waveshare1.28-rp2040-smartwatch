@@ -22,8 +22,8 @@ bool held = false;
 
 int obstacleX = 0;
 int obstacleWidth = 20;
-int minObstacleHeight = 50;//80
-int maxObstacleHeight = 150;//110
+int minObstacleHeight = 50;   //80
+int maxObstacleHeight = 150;  //110
 
 void generateObstacle() {
   if (obstacleX < -obstacleWidth) {
@@ -41,32 +41,34 @@ bool isCollision() {
 }
 
 void flappyBird() {
-  if(startup){
-    startup=false;
-    speedMode=true;
+  if (startup) {
+    startup = false;
+    speedMode = true;
     Paint_Clear(BLUE);
     Paint_DrawRectangle(0, 0, 240, 240, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
   }
   if (tap) {
-    if(held == false){
-      held=true;
-      vel -= 15; // Adjust the tap velocity here
+    if (held == false) {
+      held = true;
+      vel -= 15;  // Adjust the tap velocity here
     }
   } else {
     held = false;
   }
   Paint_DrawRectangle(0, 0, 240, 240, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(50, birdY, 70, birdY + 20, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
   Paint_DrawRectangle(obstacleX, 0, obstacleX + obstacleWidth, gapPosition, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(obstacleX, gapPosition + gapSize, obstacleX + obstacleWidth, 240, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawString_EN(140, 84, (std::to_string(score)).c_str(), &Font16, BLUE, RED);
 
   if (inTransition == false) {
     if (pauseRender == false) {
-      LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);
+      //LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);
       LCD_1IN28_DisplayWindows(max(0, min(240, obstacleX)), 0, max(0, min(240, obstacleX + obstacleWidth + 15)), gapPosition, BlackImage);
-      LCD_1IN28_DisplayWindows(max(0, min(240, obstacleX)), gapPosition+gapSize, max(0, min(240, obstacleX + obstacleWidth + 15)), 240, BlackImage);
+      LCD_1IN28_DisplayWindows(max(0, min(240, obstacleX)), gapPosition + gapSize, max(0, min(240, obstacleX + obstacleWidth + 15)), 240, BlackImage);
+      LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);
     }
 
     vel += gravity;

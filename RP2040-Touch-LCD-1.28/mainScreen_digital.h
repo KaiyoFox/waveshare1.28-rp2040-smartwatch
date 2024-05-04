@@ -10,8 +10,9 @@ extern UWORD *BlackImage;
 extern uint16_t deviceMainColorTheme;
 extern uint16_t deviceSecondColorTheme;
 extern uint16_t deviceThirdColorTheme;
+extern bool BLEconnected;
 bool swipe(std::string dir, int thresh);
-void saveToEEPROMX(unsigned long data);
+void saveToEEPROMX(unsigned long data, int addr);
 void openApp(std::string app, std::string dir, int start);
 #endif
 
@@ -23,8 +24,8 @@ float resultButINeedPrivates;
 
 
 
-float operatingVoltage = 2.4; // Replace with your actual operating voltage
-float minVoltage = 2.29; // Replace with your actual minimum voltage
+float operatingVoltage = 2.4;  // Replace with your actual operating voltage
+float minVoltage = 2.29;       // Replace with your actual minimum voltage
 
 
 void mainScreen() {
@@ -35,14 +36,14 @@ void mainScreen() {
   unsigned long seconds = (elapsed_time % 60000);
   unsigned long days = int(elapsed_time / 86400000) / 24;  //um
 
-  int second_x = 120 - (105 * sin(((seconds/166.666666666) + 180) * PI / 180));
-  int second_y = 120 + (105 * cos(((seconds/166.666666666) + 180) * PI / 180));
+  int second_x = 120 - (105 * sin(((seconds / 166.666666666) + 180) * PI / 180));
+  int second_y = 120 + (105 * cos(((seconds / 166.666666666) + 180) * PI / 180));
 
   if (hours > 12) {
     hours = hours - 12;
   }
-  if(hours==0){
-    hours=12;
+  if (hours == 0) {
+    hours = 12;
   }
 
 
@@ -53,7 +54,7 @@ void mainScreen() {
     Paint_DrawString_EN(140, 84, "CHRG", &Font16, BLACK, GREEN);
   } else {
     float adjustedResult = min(resultButINeedPrivates, 3.11);
-    int batteryPercentage = min(int(((resultButINeedPrivates - minVoltage) / (operatingVoltage - minVoltage)) * 100),100);
+    int batteryPercentage = min(int(((resultButINeedPrivates - minVoltage) / (operatingVoltage - minVoltage)) * 100), 100);
     Paint_DrawString_EN(140, 84, (std::to_string(batteryPercentage) + "%").c_str(), &Font16, BLACK, GREEN);
   }
   Paint_DrawImage1(RunningPerson, 120, 114, 16, 16, RED);  //stepCount
@@ -83,29 +84,32 @@ void mainScreen() {
 
   if (elapsed_time - last > 15000) {
     last = elapsed_time;
-    saveToEEPROMX(last);
+    saveToEEPROMX(last, 1);
   }
 
   if (resultButINeedPrivates > 2.9) {
     Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
   }
 
+  if (!BLEconnected) {
+    Paint_DrawImage1(NoConnection, 120 - 8, 185, 16, 16, RED);
+  }
+
   //Stuffs
 
   if (inTransition == false) {
+    if (swipe("right", 70)) {
+      openApp("Weather", "LR", Touch_CTS816.x_point);
+    } else if (swipe("left", 70)) {
+      openApp("News", "RL", Touch_CTS816.x_point);
+    } else if (swipe("down", 70)) {
+      openApp("notifPane", "UD", Touch_CTS816.y_point);
+    };
     //LCD_1IN28_DisplayWindows(30, 109, 64, 159, BlackImage);
     if (pauseRender == false) {
       //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
       LCD_1IN28_Display(BlackImage);
     }
     //LCD_1IN28_DisplayWindows(max(0,second_x-34), max(0,second_y-34), min(second_x+34,240), min(second_y+34,240), BlackImage);
-
-    if (swipe("right", 70)) {
-      openApp("weather", "LR", Touch_CTS816.x_point);
-    } else if (swipe("left", 70)) {
-      openApp("news", "RL", Touch_CTS816.x_point);
-    } else if (swipe("down", 70)) {
-      openApp("notifPane", "UD", Touch_CTS816.y_point);
-    };
   }
 }
