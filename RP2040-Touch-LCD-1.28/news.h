@@ -73,7 +73,7 @@ void news() {
 
 
   if (inTransition == false) {
-        if (lastUsedAppName == "main") {
+    if (lastUsedAppName == "main") {
       if (swipe("right", 70)) {
         if (std::find(backgroundApps.begin(), backgroundApps.end(), runningAppName) != backgroundApps.end()) {
           backgroundApps.remove(runningAppName);

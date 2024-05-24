@@ -22,7 +22,6 @@ extern int idleTime;
 extern int lastBatteryCheck;
 extern std::map<std::string, uint16_t> colorCache;
 extern UWORD *BlackImage;
-extern AppPtr runningApp;
 extern std::string runningAppName;
 extern std::string lastUsedAppName;
 extern std::map<std::string, AppPtr> apps;

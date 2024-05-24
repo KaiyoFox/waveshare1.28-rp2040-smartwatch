@@ -1,15 +1,20 @@
 #include "LCD_Test.h"
 #include "hardware/vreg.h"
 #include "pico/stdlib.h"
+#include "App.h"
+#include <functional>
 #include <EEPROM.h>
 #include <Arduino.h>
 #include <Arduino_JSON.h>
 #include <map>
 #include <string>
 #include <list>
+#include <tuple>
+#include <iostream>
+#include <chrono>
 
 //Builtin-Apps/Processes:
-//nclude "home.h"
+//include "home.h"
 #include "mainScreen.h"
 #include "notifPane.h"
 #include "appsPanel.h"
@@ -35,6 +40,10 @@
 #include "findMyPhone.h"
 #include "alarms.h"
 
+//Apps V2
+#include "appVersTwo.h"
+#include "appVersTwoTestTwo.h"
+
 
 int address = 1;
 int CurTime;
@@ -49,12 +58,13 @@ bool otherSwipe = false;
 bool startup = false;
 bool medClock = false;
 bool turboClock = false;
-bool batSaver = false;
 bool buttonDown = false;
 bool butaction = false;
 bool butActionRan = false;
 bool dontRunDimAgain = true;
+bool systemDisplayUpdates = false;
 bool BLEconnected = false;
+bool resetTransitionAfterTick = false;
 int tapHeld = 0;
 int tickTenTen = 0;
 int updateHome = 0;
@@ -64,19 +74,26 @@ int frameCount = 0;
 int fps = 0;
 int lastfpstick = 0;
 bool oneTickPause = false;
+bool typeOfApp = false;
 int buttonPressCount = 0;
 const char* message = "";
+std::string keyboardTyped = "";
+std::string keyboardData = "";
 std::map<std::string, uint16_t> colorCache;
 UWORD* BlackImage;
 typedef void (*AppPtr)();
-AppPtr runningApp;
+AppPtr runningAppV1;
+std::function<void()> runningAppV2;
+std::list<std::string> appNames;
+std::map<std::string, AppPtr> apps;
+std::map<std::string, App*> appsV2;
 std::string runningAppName = "boot";
 std::string lastUsedAppName = "main";
-std::map<std::string, AppPtr> apps;
 std::list<float> batVoltages = {};
+std::list<std::string> appPermissions = {};
 int autoClock = 15000;  //Auto clock screen
 std::string error = "";
-std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error" };
+std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time"};
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
 struct Service {
@@ -84,6 +101,37 @@ struct Service {
   ServiceFunction function;
 };
 std::list<Service> services;
+void appV2() {
+  typeOfApp = true;
+  auto itNew = appsV2.find(runningAppName);
+  if (itNew != appsV2.end()) {
+    runningAppV2 = [instance = itNew->second]() {
+      instance->update();
+    };
+    runningAppV2();
+  }
+};
+
+std::string appTitle = "";    // Title
+std::string appDesc = "";     // Description
+std::string appPub = "";      // Publisher
+std::string appOthInfo = "";  // Other Info
+float appVersion = 0.0;       // Version
+int appDatePub = 0;           // Unix Timestamp
+std::string appHash = "";     // More Unique Identifier
+
+
+typedef void (App::*func)();
+void runningApp() {
+  if (typeOfApp == true) {
+    runningAppV2();
+  } else {
+    runningAppV1();
+  }
+  if (systemDisplayUpdates && pauseRender == false && inTransition == false) {
+    LCD_1IN28_Display(BlackImage);
+  }
+}
 //std::vector<Service> services;
 
 const int sendPin = 17;     // 2Pin to send data
@@ -93,10 +141,13 @@ uint8_t flag = 0;
 void Touch_INT_callback();
 void buttonPress();
 
+
+//Some settings
 uint16_t deviceMainColorTheme = 0x739c;    //0x009688;
 uint16_t deviceSecondColorTheme = 0xecfa;  //0xFE6B;
 uint16_t deviceThirdColorTheme = 0xc41a;   //0x06d5;
 bool aod = false;
+bool batSaver = false;
 
 void clearEEPROM(int addr) {
   EEPROM.begin(512);  // Initialize EEPROM
@@ -127,19 +178,6 @@ unsigned long readFromEEPROM(int addr) {
 //unsigned long readFromEEPROM(int addr) {
 //  return 0;
 //}
-
-
-
-
-
-#include <tuple>
-#include <chrono>
-
-
-#include <iostream>
-#include <string>
-#include <list>
-#include <chrono>
 
 int timeSinceLastButton = 0;
 
@@ -176,22 +214,25 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
       lastScrollY = scrollY;
       wasAbleToCheck = false;
     }
-    otherSwipe = false;
-    watchSwipe = false;
+
+    if (draggingScrollE) {
+      otherSwipe = false;
+      watchSwipe = false;
+    }
   } else {
     if (draggingScrollE) {
       if (wasAbleToCheck) {
         scrollV = (scrollY - lastScrollY) / 2;  //more percise
         wasAbleToCheck = false;
-        Serial.println("Slow");
+        //Serial.println("Slow");
       } else {
         scrollV = (scrollY - initialScroll) / 1.3;  //likely a quick motion
-        Serial.println("Quick");
+        //Serial.println("Quick");
       }
       scrollY += scrollV;
       scrollV *= friction;
       Paint_DrawCircle(230 - abs((scrollY - (120 - 29)) / 4) + 1, scrollY + 29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
-      LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
+      ///////////////////////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
       //Serial.println(scrollY,lastScrollY);
       draggingScrollE = false;
     }
@@ -226,7 +267,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
     scrollY += scrollV;
     scrollV *= friction;
     //Paint_DrawCircle(230-abs((scrollY-(120-29))/4)+1, scrollY+29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
-    LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);  //-abs((scrollY-(120+20))/4)
+    ////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);  //-abs((scrollY-(120+20))/4)
   }
 
   // Clamp scrollY within bounds
@@ -243,7 +284,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
   //}
 
   // Determine if scrolling is happening
-  scrolling = draggingScrollE || std::abs(int(scrollV)) > 1;
+  scrolling = draggingScrollE || std::abs(int(scrollV)) > 2;
 
   // Return values
   std::list<int> resultList;
@@ -257,10 +298,10 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
 
 void sendText(const char* text) {  //new
   vreg_set_voltage(VREG_VOLTAGE_1_30);
-  delay(5);
+  delay(1);  //5
   set_sys_clock_khz(400000, true);
   digitalWrite(sendPin, HIGH);
-  delay(300);
+  delay(150);  //300
   digitalWrite(sendPin, LOW);
 
   lastfpstick = millis();
@@ -268,14 +309,14 @@ void sendText(const char* text) {  //new
   //text += '\0';
   //for (int i = 0; i < text.length(); i++) {
   int lastTime = 0;
-  delay(5);  //20
+  delay(2);  //5
   for (int i = 0; text[i] != '\0'; i++) {
     lastfpstick = millis();
     digitalWrite(sendPin, LOW);
-    delay(10);  //10
+    delay(7);  //10
     bool lastA = LOW;
     digitalWrite(sendPin, HIGH);
-    delay(5);
+    delay(5);  //5
     digitalWrite(sendPin, LOW);
     //Serial.println("F");
     for (int j = 0; j < 8; j++) {
@@ -285,7 +326,7 @@ void sendText(const char* text) {  //new
       } else {
         digitalWrite(sendPin, LOW);
       }
-      delay(2);
+      delay(1);  //2
       //Serial.println("wait for other dude");
       lastTime = millis();
       while (digitalRead(receivePin) == lastA && millis() - lastTime < 100) {}
@@ -301,9 +342,9 @@ void sendText(const char* text) {  //new
     digitalWrite(sendPin, LOW);
   }
 
-  delay(10);
+  delay(5);
   digitalWrite(sendPin, LOW);
-  delay(10);
+  delay(5);
   lastfpstick = millis();
   bool last = LOW;
   digitalWrite(sendPin, HIGH);
@@ -316,12 +357,12 @@ void sendText(const char* text) {  //new
     //    } else {
     //      digitalWrite(sendPin, LOW);
     //    }
-    delay(5);
+    delay(2);
     lastTime = millis();
     while (digitalRead(receivePin) == last && millis() - lastTime < 100) {}
     last = digitalRead(receivePin);
   }
-  Serial.println("Done");
+  //Serial.println("Done");
   lastfpstick = millis();
 
   digitalWrite(sendPin, LOW);
@@ -452,7 +493,7 @@ void receiveText() {
     //Serial.println("WAiting for Okay");
     while (digitalRead(receivePin) == LOW) {}
     //Serial.println("Okay ACK");
-    delay(8);
+    delay(7);  //8 05/11/24 changed it to "6"
     for (int i = 0; i < 8; i++) {
       int startSpeed = millis();
       while (millis() - startSpeed <= 8 && digitalRead(receivePin) == lastForSpeed) {}
@@ -557,164 +598,145 @@ bool timedOut = false;
 
 void awareNess() {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
-  delay(5);
+  delay(1);
   set_sys_clock_khz(400000, true);
   Paint_DrawRectangle(10, 215, 230, 235, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawString_EN(82, 220, "Check Aware", &Font12, DARKGRAY, YELLOW);  //7
   LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
 }
 
+int checkNotifUpdate = 0;
+
 void checkNotif() {
-  if (digitalRead(18) == HIGH) {  //digitalRead(18) == HIGH
-    //Serial.println("HIGH");
-    vreg_set_voltage(VREG_VOLTAGE_1_30);
-    delay(5);
-    set_sys_clock_khz(400000, true);
-    Paint_DrawRectangle(10, 215, 230, 235, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawString_EN(82, 220, "Device Busy", &Font12, DARKGRAY, RED);  //7
-    LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
-    lastfpstick = millis();
-    tapHeld = 0;
-    Serial.println("RUN");
-
-    delay(5);
-    digitalWrite(sendPin, HIGH);
-    delay(5);
-    digitalWrite(sendPin, LOW);
-    delay(5);
-    //tap=false;
-    // LISTEN TO DATA
-
-
-    /*
-    char receivedText[2048] = "";
-    int index = 0;
-    int lastState = 0;  //digitalRead(17);
-    int curState = lastState;
-    timedOut = false;
-    //digitalWrite(26, HIGH);
-    //delay(500);
-    //digitalWrite(26, LOW);
-    //delay(5);
-    //runningApp();
-    int totalTimeToRec = millis();
-    while (millis() - totalTimeToRec < 60000) {  //can't take longer than 30seconds to receieve
-      //runningApp(); //If an app is too laggy / slow it will cause issues, and yeah
-      char receivedChar = receiveChar();
-      if (receivedChar == '\0') {
-        break;  // End of transmission
-      }
-      if (receivedChar != '\2') {
-        receivedText[index++] = receivedChar;
-      }
-    }
-    if (millis() - totalTimeToRec > 60000) {
-      timedOut = true;
-      Serial.println("Took too long.");
-    }
-    */
-    //char receivedText[2048] = "";
-    int a = millis();
-    idleTime = millis();
-    while (digitalRead(18) == HIGH && millis() - a < 10000) { lastfpstick = millis(); }
-    lastfpstick = millis();
-    if (millis() - a < 10000) {
-      receiveText();
-      idleTime = millis();
+  if (millis() - checkNotifUpdate > 150) {
+    checkNotifUpdate = millis();
+    if (digitalRead(18) == HIGH) {  //digitalRead(18) == HIGH
+      //Serial.println("HIGH");
+      vreg_set_voltage(VREG_VOLTAGE_1_30);
+      delay(1);
+      set_sys_clock_khz(400000, true);
+      Paint_DrawRectangle(10, 215, 230, 235, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawString_EN(82, 220, "Device Busy", &Font12, DARKGRAY, RED);  //7
+      LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
       lastfpstick = millis();
+      tapHeld = 0;
+      Serial.println("RUN");
 
-      Serial.print("DATA GOT");
-      Serial.println(receivedTextMAIN);
-      //runningApp(); //certainly, not recommened anymore, because of internet
+      delay(1);
+      digitalWrite(sendPin, HIGH);
+      delay(5);
+      digitalWrite(sendPin, LOW);
+      delay(5);
 
 
-      JSONVar myObject = JSON.parse(receivedTextMAIN);
-      std::string appNotif = removeQuotes(JSON.stringify(myObject["app"])).c_str();
-      title = removeQuotes(JSON.stringify(myObject["title"])).c_str();
-      content = removeQuotes(JSON.stringify(myObject["text"])).c_str();
-      //NO LONGER NEEDED?????????????????? receivedText[index] = '\0';
+      int a = millis();
+      idleTime = millis();
+      while (digitalRead(18) == HIGH && millis() - a < 5000) { lastfpstick = millis(); }  //5000 was 10000
+      lastfpstick = millis();
+      if (millis() - a < 10000) {
+        receiveText();
+        idleTime = millis();
+        lastfpstick = millis();
 
-      Serial.println(receivedTextMAIN);
+        Serial.print("DATA GOT");
+        Serial.println(receivedTextMAIN);
+        //runningApp(); //certainly, not recommened anymore, because of internet
 
-      //runningApp(); //certainly, not recommened anymore, because of internet
 
-      if (receivedTextMAIN != "" && receivedTextMAIN != " " && myObject != "") {
-        BLEconnected = true;
-      }
-      if (appNotif == "messages") {
-        std::string phoneNumber = title;
-        std::string foundContactName;
+        JSONVar myObject = JSON.parse(receivedTextMAIN);
+        std::string appNotif = removeQuotes(JSON.stringify(myObject["app"])).c_str();
+        title = removeQuotes(JSON.stringify(myObject["title"])).c_str();
+        content = removeQuotes(JSON.stringify(myObject["text"])).c_str();
+        //NO LONGER NEEDED?????????????????? receivedText[index] = '\0';
 
-        for (const auto& contact : foundContacts) {
-          if (contact.size() >= 2 && contact.back() == phoneNumber) {
-            foundContactName = contact.front();
-            break;
+        Serial.println(receivedTextMAIN);
+
+        //runningApp(); //certainly, not recommened anymore, because of internet
+
+        if (receivedTextMAIN != "" && receivedTextMAIN != " " && myObject != "") {
+          BLEconnected = true;
+        }
+        if (appNotif == "messages") {
+          std::string phoneNumber = title;
+          std::string foundContactName;
+
+          for (const auto& contact : foundContacts) {
+            if (contact.size() >= 2 && contact.back() == phoneNumber) {
+              foundContactName = contact.front();
+              break;
+            }
+          }
+
+          if (foundContactName.empty()) {
+            foundContactName = phoneNumber;
+          }
+          Serial.println(removeQuotes(JSON.stringify(myObject["app"])).c_str());
+
+          notifications.push_back({ phoneNumber, "Messages", content, foundContactName });
+          //Paint_DrawString_EN(100, 100, receivedText, &Font16, BLACK, RED);
+          //Serial.println(receivedText); // Print received NFC data
+
+          //if (runningAppName == "home") {
+          //  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+          //  Paint_DrawRectangle(120 - ((17 * content.length()) / 2) - 10, 100, ((17 * content.length()) / 2) + 10, 134, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+          //  Paint_DrawString_EN(120 - ((17 * content.length()) / 2), 110, content.c_str(), &Font24, DARKGRAY, WHITE);
+          //  LCD_1IN28_Display(BlackImage);
+          //}
+          lastfpstick = millis();
+          digitalWrite(D28, HIGH);
+          delay(250);
+          digitalWrite(D28, LOW);
+          delay(200);
+          digitalWrite(D28, HIGH);
+          delay(200);
+          digitalWrite(D28, LOW);
+          lastfpstick = millis();
+        } else if (appNotif == "weather") {
+          weatherTemp = content;
+          weatherDesc = title;
+        } else if (appNotif == "news") {
+          Serial.println(content.c_str());
+          String newsTitleString = content.c_str();
+          newsTitle = split(content, '\242');
+          Serial.println(newsTitle.front().c_str());
+        } else if (appNotif == "con") {
+          if (content == "con") {
+            BLEconnected = true;
+          } else {
+            BLEconnected = false;
+          }
+        } else {
+          if (BLEconnected) {
+            Serial.println("Unknown Data");
+            BLEconnected = false;
           }
         }
 
-        if (foundContactName.empty()) {
-          foundContactName = phoneNumber;
+        if (!BLEconnected) {
+          for (const auto& innerList : notifications) {
+            if (std::find(innerList.begin(), innerList.end(), "Disconnected") != innerList.end()) {
+              bool foundAhck = true;
+            }
+          }
+          bool foundAhck = false;
+          if (foundAhck == false) {
+            notifications.push_back({ "Disconnected", "Settings", "Device disconnected", "network" });
+          }
         }
-        Serial.println(removeQuotes(JSON.stringify(myObject["app"])).c_str());
-
-        notifications.push_back({ phoneNumber, "messages", content, foundContactName });
-        //Paint_DrawString_EN(100, 100, receivedText, &Font16, BLACK, RED);
-        //Serial.println(receivedText); // Print received NFC data
-
-        //if (runningAppName == "home") {
-        //  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-        //  Paint_DrawRectangle(120 - ((17 * content.length()) / 2) - 10, 100, ((17 * content.length()) / 2) + 10, 134, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-        //  Paint_DrawString_EN(120 - ((17 * content.length()) / 2), 110, content.c_str(), &Font24, DARKGRAY, WHITE);
-        //  LCD_1IN28_Display(BlackImage);
-        //}
-        digitalWrite(D28, HIGH);
-        delay(250);
-        digitalWrite(D28, LOW);
-        delay(200);
-        digitalWrite(D28, HIGH);
-        delay(200);
-        digitalWrite(D28, LOW);
-        //DEV_SET_PWM(2);
-        //delay(100);
-        //DEV_SET_PWM(100);
-        //delay(200);
-        //DEV_SET_PWM(2);
-        //delay(400);
-        //DEV_SET_PWM(100);
-        //delay(300);
-      } else if (appNotif == "weather") {
-        weatherTemp = content;
-        weatherDesc = title;
-      } else if (appNotif == "news") {
-        Serial.println(content.c_str());
-        String newsTitleString = content.c_str();
-        newsTitle = split(content, '\242');
-        Serial.println(newsTitle.front().c_str());
-      } else if (appNotif == "con") {
-        if (content == "con") {
-          BLEconnected = true;
-        } else {
-          BLEconnected = false;
+        lastfpstick = millis();
+        idleTime = millis();
+        LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
+        if (runningAppName == "home") {
+          if (aod && batSaver == false) {
+            DEV_SET_PWM(2);
+          } else {
+            LCD_1IN28_Clear(BLACK);
+            DEV_SET_PWM(0);
+          }
+          set_sys_clock_khz(32000, true);
+          delay(1);
+          vreg_set_voltage(VREG_VOLTAGE_0_90);
         }
-      } else {
-        if (BLEconnected) {
-          Serial.println("Unknown Data");
-          BLEconnected = false;
-        }
-      }
-      lastfpstick = millis();
-      idleTime = millis();
-      LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
-      if (runningAppName == "home") {
-        if (aod && batSaver == false) {
-          DEV_SET_PWM(2);
-        } else {
-          LCD_1IN28_Clear(BLACK);
-          DEV_SET_PWM(0);
-        }
-        set_sys_clock_khz(32000, true);
-        delay(10);
-        vreg_set_voltage(VREG_VOLTAGE_0_90);
       }
     }
   }
@@ -821,6 +843,12 @@ bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground,
       if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
         if (tapHeld <= 1) {
           tap = false;
+          otherSwipe = false;
+          watchSwipe = false;
+          inTransition = false;
+          pauseRender = false;
+          scrollV = 0;
+          scrollY = 0;
           tapHeld = 999;
           return true;
         }
@@ -850,6 +878,15 @@ void internet_post(std::string toilet, std::string data) {
   Paint_DrawRectangle(10, 215, 230, 235, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawString_EN(82, 220, "Netwrk Busy", &Font12, DARKGRAY, RED);  //7
   LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
+  lastfpstick = millis();
+  std::string text = "inet" + toilet + ";" + data;
+  message = text.c_str();
+  sendText(message);
+  lastfpstick = millis();
+
+  LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
+  delay(100);
+  //Note: No response!
 }
 
 std::string internet_get(std::string toilet) {
@@ -888,16 +925,16 @@ std::string internet_get(std::string toilet) {
 }
 
 
-void transitionLR(std::string app, int begin = 0) {
+void transitionLROLD(std::string app, int begin = 0) {
   AppPtr func = apps[app];
   inTransition = true;
   int transP = begin;
   Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   func();
   LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
-  float transV = 50;  ///((begin/240)+1);//25-(25*(begin/240)); //pos
-  while (transP < 246) {
-    transV = transV / 1.18;
+  float transV = (1 - ((begin) / 240)) * 25;  //50;//50  ///((begin/240)+1);//25-(25*(begin/240)); //pos
+  while (transP < 246 && abs(transV) > 0.1) {
+    transV = transV / 1.2;  //1.18
     //Paint_DrawRectangle(0, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     func();
     //Paint_DrawRectangle(min(max(transP, 0),240), 0, min(transP+6, 240), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -908,16 +945,114 @@ void transitionLR(std::string app, int begin = 0) {
   inTransition = false;
   //func();
 }
-void transitionRL(std::string app, int begin = 240) {  //bad
+
+void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
+  AppPtr func = apps[app];
+  std::function<void()> funcA;
+  inTransition = true;
+  int transP = begin;
+  //I commented out the lower lines a while back for some odd reason
+  //Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      //funcA();
+    }
+  } else {
+    //func();
+  }
+  //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  //Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  //func();
+  //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  float radius = 0;
+  float radVel = 50;
+  while (radVel > 1 && radius <= 240) {
+    radVel = radVel / 1.1;
+    radius += radVel;
+    if (typeOfApp) {
+      funcA();  //new
+    } else {
+      func();
+    }
+    LCD_1IN28_DisplayWindows(min(240, max(0, radius - 100)), 0, min(240, max(0, radius)), 240, BlackImage);
+    //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
+    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
+  }
+}
+
+void transitionLEER(std::string app, int begin = 0, bool typeOfApp = false) {
+  AppPtr func = apps[app];
+  inTransition = true;
+  int transP = begin;
+  Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  func();
+  LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  float radius = 1;
+  float radVel = 20;
+  while (radVel > 1) {
+    radVel = radVel / 1.1;
+    radius += radVel;
+    func();  //new app
+    int newRad = radius / 2;
+    LCD_1IN28_DrawCircle(10, 120, radius, radius, BlackImage);
+    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
+  }
+}
+
+void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
+  AppPtr func = apps[app];
+  std::function<void()> funcA;
+  inTransition = true;
+  int transP = begin;
+  //I commented out the lower lines a while back for some odd reason
+  //Paint_DrawRectangle(240, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      //funcA();
+    }
+  } else {
+    //func();
+  }
+  //LCD_1IN28_DisplayWindows(begin, 0, 240, 240, BlackImage);
+  inTransition = true;
+
+  //Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  //func();
+  //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  float radius = 240;
+  float radVel = 50;
+  while (radVel > 1 && radius >= 0) {
+    radVel = radVel / 1.1;
+    radius -= radVel;
+    if (typeOfApp) {
+      funcA();  //new
+    } else {
+      func();
+    }
+    LCD_1IN28_DisplayWindows(min(240, max(0, radius)), 0, min(240, max(0, radius + 100)), 240, BlackImage);
+    //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
+    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
+  }
+}
+
+void transitionRLADSIYHKAJSD(std::string app, int begin = 240) {  //bad
   AppPtr func = apps[app];
   inTransition = true;
   int transP = begin;
   Paint_DrawRectangle(240, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   func();
   LCD_1IN28_DisplayWindows(begin, 0, 240, 240, BlackImage);
-  float transV = -50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
-  while (transP > -6) {
-    transV = transV / 1.18;
+  float transV = (((begin) / 240)) * 25;  //-50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
+  while (transP > -6 && abs(transV) > 0.1) {
+    transV = transV / 1.2;
     //Paint_DrawRectangle(240, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     func();
     //Paint_DrawRectangle(min(max(transP, 0),240), 0, max(0,transP-6), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -928,16 +1063,16 @@ void transitionRL(std::string app, int begin = 240) {  //bad
   inTransition = false;
   //func();
 }
-void transitionUD(std::string app, int begin = 0) {
+void transitionUDSDFDFD(std::string app, int begin = 0) {
   AppPtr func = apps[app];
   inTransition = true;
   int transP = begin;
   Paint_DrawRectangle(0, 0, 240, min(max(transP, 0), 240), BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   func();
   LCD_1IN28_DisplayWindows(0, 0, 240, begin, BlackImage);
-  float transV = 50;  ///((begin/240)+1);//25-(25*(begin/240)); //pos
-  while (transP < 246) {
-    transV = transV / 1.18;  //1.08 @ 25
+  float transV = (1 - ((begin) / 240)) * 25;  //50;  ///((begin/240)+1);//25-(25*(begin/240)); //pos
+  while (transP < 246 && abs(transV) > 0.1) {
+    transV = transV / 1.2;  //1.08 @ 25
     //Paint_DrawRectangle(0, 0, 240, min(max(transP, 0),240), BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     func();
     //Paint_DrawRectangle(0, min(max(transP, 0),240), 240, min(transP+6, 240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -948,16 +1083,59 @@ void transitionUD(std::string app, int begin = 0) {
   inTransition = false;
   //func();
 }
-void transitionDU(std::string app, int begin = 240) {  //bad
+
+void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
+  AppPtr func = apps[app];
+  std::function<void()> funcA;
+  inTransition = true;
+  int transP = begin;
+  //I commented out the lower lines a while back for some odd reason
+  //Paint_DrawRectangle(0, 0, 240, min(max(transP, 0), 240), BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      //funcA();
+    }
+  } else {
+    //func();
+  }
+  //LCD_1IN28_DisplayWindows(0, begin, 240, 240, BlackImage);
+  inTransition = true;
+  //Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  //func();
+  //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  float radius = 0;
+  float radVel = 50;
+  while (radVel > 1 && radius <= 240) {
+    radVel = radVel / 1.1;
+    radius += radVel;
+    if (typeOfApp) {
+      funcA();  //new
+    } else {
+      func();
+    }
+    LCD_1IN28_DisplayWindows(0, min(240, max(0, radius - 100)), 240, min(240, max(0, radius)), BlackImage);
+    //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
+    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
+  }
+}
+
+
+
+
+void transitionDUASDASD(std::string app, int begin = 240) {  //bad
   AppPtr func = apps[app];
   inTransition = true;
   int transP = begin;  //240 -
   Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   func();
   LCD_1IN28_DisplayWindows(0, begin, 240, 240, BlackImage);
-  float transV = -50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
-  while (transP > -6) {
-    transV = transV / 1.18;
+  float transV = (((begin) / 240)) * 25;  //-50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
+  while (transP > -6 && abs(transV) > 0.1) {
+    transV = transV / 1.2;
     //Paint_DrawRectangle(0, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     func();
     //Paint_DrawRectangle(0, min(max(transP, 0),240), 240, max(0,transP-6), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -967,6 +1145,43 @@ void transitionDU(std::string app, int begin = 240) {  //bad
   }
   inTransition = false;
   //func();
+}
+
+void transitionDU(std::string app, int begin = 240, bool typeOfApp = false) {
+  AppPtr func = apps[app];
+  std::function<void()> funcA;
+  inTransition = true;
+  int transP = begin;
+  //I commented out the lower lines a while back for some odd reason
+  //Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      //funcA();
+    }
+  } else {
+    //func();
+  }
+  //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
+  inTransition = true;
+
+  float radius = 240;
+  float radVel = 50;
+  while (radVel > 1 && radius >= 0) {
+    radVel = radVel / 1.1;
+    radius -= radVel;
+    if (typeOfApp) {
+      funcA();  //new
+    } else {
+      func();
+    }
+    LCD_1IN28_DisplayWindows(0, min(240, max(0, radius)), 240, min(240, max(0, radius + 100)), BlackImage);
+    //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
+    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
+  }
 }
 
 void smallDelay() {
@@ -982,11 +1197,25 @@ void smallDelay() {
   );
 }
 
-void transitionRAND(std::string app) {  //bad
+void transitionRAND(std::string app, bool typeOfApp = false) {  //good
   AppPtr func = apps[app];
+  std::function<void()> funcA;
   inTransition = true;
-  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      funcA();
+    } else {
+      Paint_DrawRectangle(0, 0, 240, 240, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    }
+  } else {
+    Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    func();
+  }
   bool rendered[240][240] = { false };
   for (int y = 0; y < 120; y++) {
     for (int x = 0; x < 120; x++) {
@@ -1008,11 +1237,25 @@ void transitionRAND(std::string app) {  //bad
   //func();
 }
 
-void transitionDOWNRAND(std::string app) {  //bad
+void transitionDOWNRAND(std::string app, bool typeOfApp = false) {  //good?
   AppPtr func = apps[app];
+  std::function<void()> funcA;
   inTransition = true;
-  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    if (itNew != appsV2.end()) {
+      std::function<void()> funcA = [instance = itNew->second]() {
+        instance->update();
+      };
+      Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      funcA();
+    } else {
+      Paint_DrawRectangle(0, 0, 240, 240, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    }
+  } else {
+    Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    func();
+  }
   bool rendered[240][240] = { false };
   for (int y = 0; y < 240; y++) {
     for (int x = 0; x < 120; x++) {
@@ -1035,18 +1278,48 @@ void transitionDOWNRAND(std::string app) {  //bad
 
 void openApp(std::string app, std::string dir = "", int start = -1) {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
-  delay(10);
+  delay(5);
   set_sys_clock_khz(400000, true);
-  idleTime = millis();
   speedMode = false;
+  idleTime = millis();
   if (app == "home") {
-    DEV_SET_PWM(5);
+    DEV_SET_PWM(50);
   } else {
-    DEV_SET_PWM(100);
+    if (runningAppName == "home") {
+      DEV_SET_PWM(50);
+    }
   }
   //DEV_Delay_ms(1);
   inTransition = true;
+  pauseRender = true;
+  resetTransitionAfterTick = true;
   AppPtr func = apps[app];
+  std::function<void()> appLaunch;     // for v2 apps
+  std::function<void()> appSysConfig;  // for v2 apps
+  //auto itOld = apps.find(app);
+  //if (itOld != apps.end()) {
+  //  // Call the function pointer
+  //  Serial.println("A");
+  //  AppPtr func = itOld->second;
+  //  Serial.println("FoundApp");
+  //  func();
+  //  Serial.println("AAA");
+  //  return;
+  //}
+
+  //^^ I prob should go through and clean up comments
+
+  /*/ Check if the appName exists in the new standard map
+  auto itNew = appsV2.find(app);
+  if (itNew != appsV2.end()) {
+    // Call the update method on the class instance
+    //AppPtr func = itNew->second->update;
+   // auto lambda = itNew->second->update;
+    // Convert lambda to function pointer and store in AppPtr
+    AppPtr func = toFunctionPointer(&App::update);
+    return;
+  }
+  //*/
   tap = false;
   tapHeld = 0;
   flag = 0;
@@ -1057,8 +1330,57 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   startup = true;
   otherSwipe = false;
   watchSwipe = false;
+  timeSinceLastButton = millis();
+  //buttonPressCount = 0;
+
+  /*
   if (runningAppName != "boot") {
     runningApp();
+  }
+*/
+
+  typeOfApp = false;
+
+  //Set Settings to default
+  appPermissions = {};
+  systemDisplayUpdates = false;  //default for v1 apps
+
+  func();
+  if (typeOfApp == false) {    //v1
+    appPermissions = { "*" };  //Unsafe
+    appTitle = app;
+    appDesc = "Unkown";
+    appPub = "Unknown";
+    appOthInfo = "Unknown";
+    appVersion = 1.0;
+    appDatePub = 0;
+    appHash = "bc7819b34ff87570745fbe461e36a16f80e562ce";
+  } else if (systemDisplayUpdates == false) {  //v2
+    systemDisplayUpdates = true;               //Default for v2 apps
+  }
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    auto it = std::find(backgroundApps.begin(), backgroundApps.end(), app);
+    if (itNew != appsV2.end()) {
+      appSysConfig = [instance = itNew->second]() {
+        instance->sysConfig();
+      };
+      appLaunch = [instance = itNew->second]() {
+        instance->launch();
+      };
+      std::function<void()> func = [instance = itNew->second]() {
+        instance->update();
+      };
+
+      appSysConfig();
+      if (it == backgroundApps.end()) {
+        appLaunch();
+      }
+    }
+    //Serial.println("V2 App");
+  } else if (app != "error" && app != "main" && app != "home" && app != "appsPanel" && app != "Developer" && app != "recentApps") {  //example get angy for outdated apps
+    error = "Warning! App is out-dated and cannot be identified.";
+    //app = "error";
   }
   if (start == -1) {
     if (dir == "DU" || dir == "RL") {
@@ -1067,25 +1389,51 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       start = 0;
     }
   }
+
+  //Significantly slows down stuff (All transition stuff)
+  func();
   if (dir == "LR") {
-    transitionLR(app, start);
+    transitionLR(app, start, typeOfApp);
   } else if (dir == "RL") {
-    transitionRL(app, start);
+    transitionRL(app, start, typeOfApp);
   } else if (dir == "UD") {
-    transitionUD(app, start);
+    transitionUD(app, start, typeOfApp);
   } else if (dir == "DU") {
-    transitionDU(app, start);
-    //transitionDOWNRAND(app);
+    transitionDU(app, start, typeOfApp);
   } else if (dir == "RAND") {
-    transitionRAND(app);
+    transitionRAND(app, typeOfApp);  //transitionDOWNRAND(app);
   }
+  func();  ///////Temp for testing? maybe may stay just needs to run smoother
+  //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
   //DEV_Delay_ms(1);
   lastUsedAppName = runningAppName;
-  runningApp = apps[app];
+
+  runningAppV1 = apps[app];  //wait so if I define with a type does it make it "local"?
+  if (typeOfApp == true) {
+    auto itNew = appsV2.find(app);
+    //if (itNew != appsV2.end()) {
+    runningAppV2 = [instance = itNew->second]() {  //std::function<void()>  runningApp
+      instance->update();
+    };
+    //}
+  }
+  //itOld = apps.find(app);
+  //if (itOld != apps.end()) {
+  //  // Call the function pointer
+  //  Serial.println("A");
+  //  runningApp = itOld->second;
+  //  Serial.println("FoundApp");
+  //  Serial.println("AAA");
+  //  return;
+  //}
   runningAppName = app;
+  //Serial.println(app.c_str());
   if (std::find(systemApps.begin(), systemApps.end(), app) == systemApps.end()) {
     if (std::find(backgroundApps.begin(), backgroundApps.end(), app) == backgroundApps.end()) {
       backgroundApps.push_back(app);
+      if (backgroundApps.size() > 5) {
+        backgroundApps.erase(backgroundApps.begin());
+      }
     }
   }
   //Paint_Clear(BLACK);
@@ -1093,12 +1441,19 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   last = 0;
   last2 = 0;
   inTransition = true;
-  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  runningApp();
-  LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
+  /////Not needed?? Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  runningApp();  ///////Temp for testing? maybe may stay just needs to run smoother
+  //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
+  //runningApp();  //extra
 
   //DEV_Delay_ms(1);
-  inTransition = false;
+  tickTenTen = 80;
+  startup = false;
+  pauseRender = false;
+  otherSwipe = false;
+  watchSwipe = false;
+  /////////inTransition = false;
+  ///////pauseRender = false;  //wait huh, Why True? was True, so if something breaks.
   //Paint_Clear(BLACK);
   //runningApp();
   //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
@@ -1106,11 +1461,11 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   last = 0;
   last2 = 0;
   if (app == "home") {
-    LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
-    DEV_Delay_ms(1);
-    LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
+    //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
+    //DEV_Delay_ms(1);
+    //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     set_sys_clock_khz(80000, true);
-    delay(10);
+    delay(1);
     vreg_set_voltage(VREG_VOLTAGE_0_90);
     last2 = millis() + 99999999999;
   } else {
@@ -1121,22 +1476,31 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       //vreg_set_voltage(VREG_VOLTAGE_0_90);
 
       vreg_set_voltage(VREG_VOLTAGE_1_30);
-      delay(10);
+      delay(1);
       set_sys_clock_khz(150000, true);  //120000
     } else {
       vreg_set_voltage(VREG_VOLTAGE_1_30);
-      delay(10);
+      delay(1);
       set_sys_clock_khz(400000, true);
     }
   }
-  runningApp();
+  //runningApp();////////////////////////////////////////
   //DEV_Delay_ms(1);
-  idleTime = millis();
-  tickTenTen = 80;
-  startup = false;
-  otherSwipe = false;
-  watchSwipe = false;
+
+  inTransition = true;
   pauseRender = true;
+  resetTransitionAfterTick = true;
+  idleTime = millis();
+  timeSinceLastButton = millis();
+  //buttonPressCount = 0;
+  //runningApp();  //extra
+  //Why does pauseRender even exist.
+  //typeOfApp = false;
+  if (app == "home") {
+    DEV_SET_PWM(5);
+  } else {
+    DEV_SET_PWM(100);
+  }
 }
 
 std::string swipeComplete = "";
@@ -1146,188 +1510,195 @@ int swipeStartThresh = 50;
 std::string activeDir = "";
 bool swipe(std::string dir, int thresh) {
   bool swipeDone = false;
-  if (tap == false && otherSwipe == true && swipeComplete == "") {
-
-    activeDir = "";
-  }
-  if (watchSwipe == false) {
-    if (tap == false) {
-      //activeDir="";
-      otherSwipe = false;
-    } else {
-      if (dir == "down" && (activeDir == "" || activeDir == dir)) {
-        if (otherSwipe) {
-          if (Touch_CTS816.y_point > thresh) {
-            swipeComplete = dir;
-          } else {
-            swipeComplete = "";
-          }
-          if (swipeComplete == "") {
-            /////////////////////////////////////////////////////////////////////////
-            //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //TURN OFF CUZ IT CAUSES GLITCHY      LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 10, 240), BlackImage);
-            /////////////////////////////////////////////////////////////////////////
-
-            //            Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //            LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
-          } else {
-            pauseRender = true;
-            Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point + 5, 240), deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);  // + 10
-            LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 5, 240), BlackImage);
-
-
-            //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
-          }
-        }
-        if (Touch_CTS816.y_point < swipeStartThresh) {
-          otherSwipe = true;
-          activeDir = "down";
-        }
-      } else if (dir == "up" && (activeDir == "" || activeDir == dir)) {
-        if (otherSwipe) {
-          if (Touch_CTS816.y_point < 240 - thresh) {
-            swipeComplete = dir;
-          } else {
-            swipeComplete = "";
-          }
-          if (swipeComplete != "") {
-            //if(tapHeld>5){
-            //  Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //  LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-20), 240, min(Touch_CTS816.y_point+60,240), BlackImage);
-            //}
-            //} else{
-            //if(tapHeld>10){
-
-            pauseRender = true;
-            Paint_DrawRectangle(0, max(Touch_CTS816.y_point - 5, 0), 240, Touch_CTS816.y_point, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            LCD_1IN28_DisplayWindows(0, max(Touch_CTS816.y_point - 5, 0), 240, min(Touch_CTS816.y_point + 25, 240), BlackImage);
-
-            //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
-
-            //}
-          }
-        }
-        if (Touch_CTS816.y_point > 110 && Touch_CTS816.y_point < 200 && watchSwipe == false) {
-          otherSwipe = true;
-          activeDir = "up";
-        }
-      } else if (dir == "right" && (activeDir == "" || activeDir == dir)) {
-        if (otherSwipe) {
-          if (Touch_CTS816.x_point > thresh) {
-            swipeComplete = dir;
-          } else {
-            swipeComplete = "";
-          }
-          if (swipeComplete == "") {
-            /////////////////////////////////////////////////////////////////////////
-            //Paint_DrawRectangle(Touch_CTS816.x_point, 0, min(Touch_CTS816.x_point+10,240), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //TURN OFF CUZ IT CAUSES GLITCHY       LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 10, 240), 240, BlackImage);  //-25, and +10
-            /////////////////////////////////////////////////////////////////////////
-          } else {
-            pauseRender = true;
-            Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point + 5, 240),0), 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 5, 240), 240, BlackImage);
-          }
-        }
-        if (Touch_CTS816.x_point < swipeStartThresh) {
-          otherSwipe = true;
-          activeDir = "right";
-        }
-      } else if (dir == "left" && (activeDir == "" || activeDir == dir)) {
-        if (otherSwipe) {
-          if (Touch_CTS816.x_point < 240 - thresh) {
-            swipeComplete = dir;
-          } else {
-            swipeComplete = "";
-          }
-          if (swipeComplete == "") {
-            /////////////////////////////////////////////////////////////////////////
-            //Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point-10,240),0), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            //TURN OFF CUZ IT CAUSES GLITCHY STUFF WHEN HOLDING STILL   LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 10), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //should be +25
-            /////////////////////////////////////////////////////////////////////////
-          } else {
-            pauseRender = true;
-            Paint_DrawRectangle(max(min(Touch_CTS816.x_point - 5, 240), 0), 0, Touch_CTS816.x_point, 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 5), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //and the other - should be -10
-          }
-        }
-        if (Touch_CTS816.x_point > 240 - swipeStartThresh) {
-          otherSwipe = true;
-          activeDir = "left";
-        }
-      }
+  if (inTransition == false) {
+    if (tap == false && otherSwipe == true && swipeComplete == "") {
+      activeDir = "";
     }
-    if (swipeComplete == activeDir && activeDir != "") {
+    if (watchSwipe == false) {
       if (tap == false) {
+        //activeDir="";
+        otherSwipe = false;
+      } else {
         if (dir == "down" && (activeDir == "" || activeDir == dir)) {
-          if (Touch_CTS816.y_point > thresh) {
-            swipeDone = true;
-            swipeComplete = "";
-            activeDir = "";
-          } else {
-            swipeComplete = "";
-            activeDir = "";
+          if (otherSwipe) {
+            if (Touch_CTS816.y_point > thresh) {
+              swipeComplete = dir;
+            } else {
+              swipeComplete = "";
+            }
+            if (swipeComplete == "") {
+              /////////////////////////////////////////////////////////////////////////
+              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //TURN OFF CUZ IT CAUSES GLITCHY      LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 10, 240), BlackImage);
+              /////////////////////////////////////////////////////////////////////////
+
+              //            Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //            LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
+            } else {
+              pauseRender = true;
+              Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point + 5, 240), deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);  // + 10
+              LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 5, 240), BlackImage);
+
+
+              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
+            }
+          }
+          if (Touch_CTS816.y_point < swipeStartThresh) {
+            otherSwipe = true;
+            activeDir = "down";
           }
         } else if (dir == "up" && (activeDir == "" || activeDir == dir)) {
-          if (Touch_CTS816.y_point < 240 - thresh) {
-            swipeDone = true;
-            swipeComplete = "";
-            activeDir = "";
-          } else {
-            swipeComplete = "";
-            activeDir = "";
+          if (otherSwipe) {
+            if (Touch_CTS816.y_point < 240 - thresh) {
+              swipeComplete = dir;
+            } else {
+              swipeComplete = "";
+            }
+            if (swipeComplete != "") {
+              //if(tapHeld>5){
+              //  Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //  LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-20), 240, min(Touch_CTS816.y_point+60,240), BlackImage);
+              //}
+              //} else{
+              //if(tapHeld>10){
+
+              pauseRender = true;
+              Paint_DrawRectangle(0, max(Touch_CTS816.y_point - 5, 0), 240, Touch_CTS816.y_point, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              LCD_1IN28_DisplayWindows(0, max(Touch_CTS816.y_point - 5, 0), 240, min(Touch_CTS816.y_point + 25, 240), BlackImage);
+
+              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
+
+              //}
+            }
+          }
+          if (Touch_CTS816.y_point > 110 && Touch_CTS816.y_point < 200 && watchSwipe == false) {
+            otherSwipe = true;
+            activeDir = "up";
           }
         } else if (dir == "right" && (activeDir == "" || activeDir == dir)) {
-          if (Touch_CTS816.x_point > thresh) {
-            swipeDone = true;
-            swipeComplete = "";
-            activeDir = "";
-          } else {
-            swipeComplete = "";
-            activeDir = "";
+          //Serial.println("Raw");
+          if (otherSwipe) {
+            //Serial.println("AA");
+            if (Touch_CTS816.x_point > thresh) {
+              swipeComplete = dir;
+            } else {
+              swipeComplete = "";
+            }
+            if (swipeComplete == "") {
+              /////////////////////////////////////////////////////////////////////////
+              //Paint_DrawRectangle(Touch_CTS816.x_point, 0, min(Touch_CTS816.x_point+10,240), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //TURN OFF CUZ IT CAUSES GLITCHY       LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 10, 240), 240, BlackImage);  //-25, and +10
+              /////////////////////////////////////////////////////////////////////////
+            } else {
+              pauseRender = true;
+              Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point + 5, 240), 0), 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 5, 240), 240, BlackImage);
+            }
+          }
+          if (Touch_CTS816.x_point < swipeStartThresh) {
+            otherSwipe = true;
+            activeDir = "right";
           }
         } else if (dir == "left" && (activeDir == "" || activeDir == dir)) {
-          if (Touch_CTS816.x_point < 240 - thresh) {
-            swipeDone = true;
-            swipeComplete = "";
-            activeDir = "";
-          } else {
-            swipeComplete = "";
-            activeDir = "";
+          if (otherSwipe) {
+            if (Touch_CTS816.x_point < 240 - thresh) {
+              swipeComplete = dir;
+            } else {
+              swipeComplete = "";
+            }
+            if (swipeComplete == "") {
+              /////////////////////////////////////////////////////////////////////////
+              //Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point-10,240),0), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //TURN OFF CUZ IT CAUSES GLITCHY STUFF WHEN HOLDING STILL   LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 10), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //should be +25
+              /////////////////////////////////////////////////////////////////////////
+            } else {
+              pauseRender = true;
+              Paint_DrawRectangle(max(min(Touch_CTS816.x_point - 5, 240), 0), 0, Touch_CTS816.x_point, 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 5), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //and the other - should be -10
+            }
           }
-        }  // else {
-        //  swipeComplete="";
-        //}
+          if (Touch_CTS816.x_point > 240 - swipeStartThresh) {
+            otherSwipe = true;
+            activeDir = "left";
+          }
+        }
+      }
+      if (swipeComplete == activeDir && activeDir != "") {
+        if (tap == false) {
+          if (dir == "down" && (activeDir == "" || activeDir == dir)) {
+            if (Touch_CTS816.y_point > thresh) {
+              swipeDone = true;
+              swipeComplete = "";
+              activeDir = "";
+            } else {
+              swipeComplete = "";
+              activeDir = "";
+            }
+          } else if (dir == "up" && (activeDir == "" || activeDir == dir)) {
+            if (Touch_CTS816.y_point < 240 - thresh) {
+              swipeDone = true;
+              swipeComplete = "";
+              activeDir = "";
+            } else {
+              swipeComplete = "";
+              activeDir = "";
+            }
+          } else if (dir == "right" && (activeDir == "" || activeDir == dir)) {
+            if (Touch_CTS816.x_point > thresh) {
+              swipeDone = true;
+              swipeComplete = "";
+              activeDir = "";
+            } else {
+              swipeComplete = "";
+              activeDir = "";
+            }
+          } else if (dir == "left" && (activeDir == "" || activeDir == dir)) {
+            if (Touch_CTS816.x_point < 240 - thresh) {
+              swipeDone = true;
+              swipeComplete = "";
+              activeDir = "";
+            } else {
+              swipeComplete = "";
+              activeDir = "";
+            }
+          }  // else {
+          //  swipeComplete="";
+          //}
+        }
       }
     }
-  }
 
-  if (swipeDone == false && swipeComplete == dir && tap == false) {
-    swipeDone = true;
-    swipeComplete = "";
-    activeDir = "";
-  }
+    if (swipeDone == false && swipeComplete == dir && tap == false) {  //just in case override
+      swipeDone = true;
+      swipeComplete = "";
+      activeDir = "";
+    }
 
-  if (otherSwipe && watchSwipe == false && swipeComplete != "") {  //swipeComplete thing new cuz whenever I tap on side it paused .. so yuck
-    pauseRender = true;
-  } else {
-    pauseRender = false;
-  }
+    if (otherSwipe && watchSwipe == false && swipeComplete != "") {  //swipeComplete thing new cuz whenever I tap on side it paused .. so yuck
+      pauseRender = true;
+    } else {
+      pauseRender = false;
+    }
 
-  //if(swipeDone==false){
-  //  if(tap){
-  //    activeDir=dir;
-  //  }
-  //}
+    if (otherSwipe) {
+      scrollV = 0;
+    }
 
-  //if(activeDir!=""){
-  //  inTransition = true;
-  //} else{
-  //  inTransition = false;
-  //}
+    //if(swipeDone==false){
+    //  if(tap){
+    //    activeDir=dir;
+    //  }
+    //}
 
+    //if(activeDir!=""){
+    //  inTransition = true;
+    //} else{
+    //  inTransition = false;
+    //}
+
+    /*
   if (tap == false && otherSwipe == true && swipeComplete == "" && swipeDone == false) {
     if (swipeComplete == "") {
       if (activeDir != "up") {
@@ -1341,7 +1712,12 @@ bool swipe(std::string dir, int thresh) {
       }
     }
   }
-
+*/
+    if (swipeDone) {
+      scrollY = 0;
+      scrollV = 0;
+    }
+  }
   return swipeDone;
 }
 
@@ -1408,7 +1784,7 @@ void runAllServices() {
     Serial.print(" of ");
     Serial.println(numServices);
     runNextService();
-    delay(1000);
+    delay(5000);
   }
   LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
 }
@@ -1433,25 +1809,126 @@ int serviceLastRan = 0;
 
 int homeAppLowPower = 1000;
 int HourMinSize = 4;
-void home() {
-  float resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
-  unsigned long elapsed_time = millis() + CurTime;  // + 46800000 + 2400000
+
+void homeExec() {
+  //resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
+  unsigned long elapsed_time = millis() + CurTime;
   unsigned long hours = (elapsed_time % 86400000) / 3600000;
   unsigned long minutes = (elapsed_time % 3600000);
   unsigned long seconds = (elapsed_time % 60000);
+  unsigned long days = int(elapsed_time / 86400000) / 24;  //um
+  int year, month, day;
+  String dayOfWeek;
+  String monthName;
+  millisToDate(elapsed_time, year, month, day, dayOfWeek, monthName);
+
+  int second_x = 120 - (105 * sin(((seconds / 166.666666666) + 180) * PI / 180));
+  int second_y = 120 + (105 * cos(((seconds / 166.666666666) + 180) * PI / 180));
+
+  if (hours > 12) {
+    hours = hours - 12;
+  }
+  preHours = hours;
+  if (hours == 0) {
+    hours = 12;
+  }
+
+  uint16_t minute_x = 120 + (110 * sin(((minutes / 10000)) * PI / 180));
+  uint16_t minute_y = 120 - (110 * cos(((minutes / 10000)) * PI / 180));
+  //uint16_t minute_x_short = 120 + (90 * sin(((minutes / 10000)) * PI / 180));
+  //uint16_t minute_y_short = 120 - (90 * cos(((minutes / 10000)) * PI / 180));
+
+  //  Paint_DrawLine(minute_x_short, minute_y_short, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_4X4, LINE_STYLE_SOLID);  // Replace 0x009688 with your chosen color
+
+  //Paint_DrawLine(120, 120, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+
+  //Paint_DrawCircle((uint16_t)minute_x, (uint16_t)minute_y, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
+  //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
+  //was 4
+
+  uint16_t hour_x = 120 + (60 * sin(((hours % 12) * 30 + 0) * PI / 180));
+  uint16_t hour_y = 120 - (60 * cos(((hours % 12) * 30 + 0) * PI / 180));
+
+  //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
+  //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
+
+  //uint16_t hour_x_circle = 120 + (59 * sin(((hours % 12) * 30 + 0) * PI / 180));
+  //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
+
+  int weathLen = weatherTemp.length();
+  Paint_DrawImage1(Sun, 120 - 8, 140, 16, 16, YELLOW);
+  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 156, weatherTemp.c_str(), &Font12, BLACK, GRAY);
+
+  String dateStr = dayOfWeek + ", " + monthName + " " + day;
+  int lengthOfDate = dateStr.length();
+  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 19, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
+
+
+  Paint_DrawLine(120, 120, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
+  Paint_DrawLine(120, 120, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+
+  //Paint_DrawCircle((uint16_t)hour_x_circle, (uint16_t)hour_y_circle, 6, 0x009688, DOT_PIXEL_6X6, DRAW_FILL_FULL); // Replace 0x00796F with your chosen color
+  Paint_DrawCircle(120, 120, 3, deviceMainColorTheme, DOT_PIXEL_3X3, DRAW_FILL_FULL);  // Replace 0x00796F with your chosen color
+
+
+
+
+
+  for (int i = 0; i < 12; ++i) {
+    uint16_t hour_x_tic = 120 + (80 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic = 120 - (80 * cos(((i % 12) * 30 + 0) * PI / 180));
+
+    uint16_t hour_x_tic_short = 120 + (75 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic_short = 120 - (75 * cos(((i % 12) * 30 + 0) * PI / 180));
+
+    if (i == preHours) {
+      uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
+      uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
+      //int lengthOfHr = std::to_string(hours).length();
+      //Paint_DrawString_EN(hour_x_mark - ((lengthOfHr * 14) / 2), hour_y_mark + get_yshift(preHours), std::to_string(hours).c_str(), &Font20, BLACK, deviceMainColorTheme);
+      Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+    } else {
+      Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, GRAY, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+    }
+  }
+
+  //was 8
+  //Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+  //  Paint_DrawString_EN(70, 190, (std::to_string(day)).c_str(), &Font16, BLACK, deviceThirdColorTheme);
+
+  //sprintf(buffer, "%02d", days, hours);
+  //Paint_DrawString_EN(100, 131, buffer, &Font24, BLACK, WHITE);
+  //Dates are weird, fix later
+
+  if (elapsed_time - last > 15000) {
+    last = elapsed_time;
+    saveToEEPROMX(last, 1);
+  }
+
+  if (!BLEconnected) {
+    Paint_DrawImage1(NoConnection, 120 - 8, 210, 16, 16, RED);
+  }
+}
+
+
+void home() {
+  float resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
+  unsigned long elapsed_time = millis() + CurTime;  // + 46800000 + 2400000
+  //unsigned long hours = (elapsed_time % 86400000) / 3600000;
+  //unsigned long minutes = (elapsed_time % 3600000);
+  //unsigned long seconds = (elapsed_time % 60000);
+
 
   lastfpstick = millis();
 
   if (batSaver == false) {
     checkNotif();
+    lastfpstick = millis();
   }
 
   //ALSO DISPLAY BAT PERCENT.
   if (aod && batSaver == false) {
-    if (resultButINeedPrivates > 2.9) {
-      Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    }
-
     if (elapsed_time - last2 > homeAppLowPower || inTransition) {
       //uint16_t second_x = 120 - (int)(110 * sin((seconds * 6 + 180) * PI / 180));
       //uint16_t second_y = 120 + (int)(110 * cos((seconds * 6 + 180) * PI / 180));
@@ -1459,29 +1936,35 @@ void home() {
       //Paint_DrawCircle((uint16_t)second_x, (uint16_t)second_y, 3, 0x009688, DOT_PIXEL_1X1, DRAW_FILL_FULL); // Replace 0x4CAF50 with your chosen color
       //for power saving reasons, comment out
 
-      uint16_t minute_x = 120 + (65 * sin(((minutes / 10000)) * PI / 180));
-      uint16_t minute_y = 120 - (65 * cos(((minutes / 10000)) * PI / 180));
-      uint16_t minute_x_short = 120 + (90 * sin(((minutes / 10000)) * PI / 180));
-      uint16_t minute_y_short = 120 - (90 * cos(((minutes / 10000)) * PI / 180));
+      //uint16_t minute_x = 120 + (65 * sin(((minutes / 10000)) * PI / 180));
+      //uint16_t minute_y = 120 - (65 * cos(((minutes / 10000)) * PI / 180));
+      //uint16_t minute_x_short = 120 + (90 * sin(((minutes / 10000)) * PI / 180));
+      //uint16_t minute_y_short = 120 - (90 * cos(((minutes / 10000)) * PI / 180));
 
-      Paint_DrawLine(minute_x_short, minute_y_short, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_4X4, LINE_STYLE_SOLID);  // Replace 0x009688 with your chosen color
+      //Paint_DrawLine(minute_x_short, minute_y_short, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_4X4, LINE_STYLE_SOLID);  // Replace 0x009688 with your chosen color
       //Paint_DrawCircle((uint16_t)minute_x, (uint16_t)minute_y, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
       //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
       //was 4
 
-      uint16_t hour_x = 120 + (58 * sin(((hours % 12) * 30 + 0) * PI / 180));
-      uint16_t hour_y = 120 - (58 * cos(((hours % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_x = 120 + (58 * sin(((hours % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_y = 120 - (58 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
-      uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
-      uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
       //uint16_t hour_x_circle = 120 + (59 * sin(((hours % 12) * 30 + 0) * PI / 180));
       //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
-      Paint_DrawLine(hour_x_cent, hour_y_cent, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_7X7, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
+      /////////Paint_DrawLine(hour_x_cent, hour_y_cent, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_7X7, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
       //Paint_DrawCircle((uint16_t)hour_x_circle, (uint16_t)hour_y_circle, 6, 0x009688, DOT_PIXEL_6X6, DRAW_FILL_FULL); // Replace 0x00796F with your chosen color
-      Paint_DrawCircle(120, 120, 8, deviceMainColorTheme, DOT_PIXEL_7X7, DRAW_FILL_FULL);  // Replace 0x00796F with your chosen color
-                                                                                           //was 8
+      ///////////Paint_DrawCircle(120, 120, 8, deviceMainColorTheme, DOT_PIXEL_7X7, DRAW_FILL_FULL);  // Replace 0x00796F with your chosen color
+      //was 8
+
+      homeExec();
+      lastfpstick = millis();
+    }
+    if (resultButINeedPrivates > 2.9) {
+      Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
     }
   }
 
@@ -1494,7 +1977,9 @@ void home() {
   if (inTransition == false) {
     if (elapsed_time - last2 > homeAppLowPower) {
       last2 = elapsed_time;
+      lastfpstick = millis();
       LCD_1IN28_Display(BlackImage);
+      lastfpstick = millis();
       //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     }
 
@@ -1512,6 +1997,21 @@ void resetFunc() {
   set_sys_clock_khz(410000, true);
 }
 
+void updateAppNames() {
+  // Clear the existing list
+  appNames.clear();
+
+  // Iterate over the old standard map and add the keys to appNames
+  for (const auto& app : apps) {
+    appNames.push_back(app.first);
+  }
+
+  // Iterate over the new standard map and add the keys to appNames
+  for (const auto& app : appsV2) {
+    appNames.push_back(app.first);
+  }
+}
+
 void errorHandle() {
   lastfpstick = millis();
   Paint_DrawRectangle(0, 0, 240, 80, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -1520,16 +2020,25 @@ void errorHandle() {
   Paint_DrawString_EN(10, 100, error.c_str(), &Font16, DARKGRAY, WHITE);
   if (inTransition == false) {
     if (pauseRender == false) {
-      LCD_1IN28_DisplayWindows(10, 100, 240, 240, BlackImage);
+      //LCD_1IN28_DisplayWindows(10, 100, 240, 240, BlackImage);
+      LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     }
 
     if (butaction) {
       butaction = false;
       saveToEEPROMX(1, 2);
       openApp("main", "", 0);
+      buttonPressCount = 0;
     }
   }
 }
+
+//#include "App.h"
+
+void myShortcutFunction() {
+  appVersTwo myApp;
+  myApp.update();
+};
 
 void setup() {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
@@ -1590,6 +2099,22 @@ void setup() {
   apps["FindMyPhone"] = &findMyPhone;
   apps["Alarms"] = &alarms;
   //apps["scrollingTest"] = &scrollingTest;
+
+  //appVersTwo &update;
+  // appVersTwo App;
+  //App.update();
+
+  //appVersTwo* appVersTwoPtr = appVersTwo;
+  //void (*myShortcutFunction)() = appVersTwoPtr->update;
+  //appVersTwo myApp;  // Create an instance of appVersTwo
+  //  void myShortcutFunction(){ appVersTwo.update(); };
+
+  apps["appVersTwo"] = &appV2;
+  appsV2["appVersTwo"] = new appVersTwo();
+
+  apps["appVersTwoTestTwo"] = &appV2;
+  appsV2["appVersTwoTestTwo"] = new appVersTwoTestTwo();
+  //updateAppNames();
 
   //BLUETOOTH CRAP
   pinMode(17, OUTPUT);  // --USED? (Incoming Clock?),. Yeah Incoming
@@ -1696,9 +2221,13 @@ void setup() {
     openApp("home", "RAND");
   }
 
+  buttonPressCount = 0;
+
   std::string test = "DevStart";
   message = test.c_str();
   sendText(message);
+
+
   //const char* message = messag.c_str();
   //  test = "DevStart";
   //  message = test.c_str();
@@ -1732,20 +2261,22 @@ int freeMemory() {
 int shouldConsiderUpdating = 0;
 int timeInTrans = 0;
 
-void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS LESS THAN X AMMOUNT OF TIME, THEN RUN DEV_DELAY FOR TIME LEFT
-  //DEV_Delay_ms(4); //kinda needed for touches to work best!
+bool alreadySet = true;
+void loop() {
   //Touch_INT_callback();
-  if (millis() - shouldConsiderUpdating > 3000 || scrolling || tap || otherSwipe || watchSwipe) {
+  ///> 3000 ,,,,,,, > 10
+  if (millis() - shouldConsiderUpdating > 5000 || (millis() - shouldConsiderUpdating > 50 && (scrolling || tap || otherSwipe || watchSwipe || inTransition))) {
     shouldConsiderUpdating = millis();
     if (batSaver == false) {
       if (speedMode == false) {
-        if ((tap && tapHeld > 3) || scrolling || otherSwipe || watchSwipe) {
+        if ((tap && tapHeld > 3) || scrolling || otherSwipe || watchSwipe || inTransition) {
           if (turboClock == false) {
             turboClock = true;
             medClock = false;
             vreg_set_voltage(VREG_VOLTAGE_1_30);
-            //delay(10);
+            delay(1);
             set_sys_clock_khz(400000, true);
+            alreadySet = true;
           }
         } else if (runningAppName != "home") {
           if (medClock == false) {
@@ -1753,10 +2284,12 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
             turboClock = false;
             //set_sys_clock_khz(32000, true);
             //vreg_set_voltage(VREG_VOLTAGE_0_90);
-
-            vreg_set_voltage(VREG_VOLTAGE_1_30);
-            //delay(10);
-            set_sys_clock_khz(150000, true);  //120000
+            if (alreadySet) {
+              vreg_set_voltage(VREG_VOLTAGE_1_30);
+              delay(1);
+              set_sys_clock_khz(150000, true);  //120000
+              alreadySet = false;
+            }
           }
         }
       }
@@ -1765,8 +2298,11 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
         if (tap) {
           medClock = true;
           turboClock = false;
-          vreg_set_voltage(VREG_VOLTAGE_1_10);
-          set_sys_clock_khz(78000, true);
+          if (alreadySet) {
+            vreg_set_voltage(VREG_VOLTAGE_1_10);
+            set_sys_clock_khz(78000, true);
+            alreadySet = false;
+          }
         }
       }
     }
@@ -1788,6 +2324,35 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
     runNextService();
   }
 
+
+  if (ticksSinceTap > 1 && tap) {  //was >1
+    tap = false;
+    //otherSwipe=false;//WAS TURNED OFF, for some reason
+    watchSwipe = false;
+    otherSwipe = false;
+    ticksSinceTap = 0;
+    activeDir = "";
+    //Serial.println("Releasse");
+  } else if (tap) {
+    ticksSinceTap++;
+  }
+
+  if (runningAppName == "home") {
+    if (millis() - updateHome > 300000) {
+      updateHome = millis();
+      runningApp();
+    }
+  } else {  // if (buttonDown == false) {
+    runningApp();
+  }
+
+  if (resetTransitionAfterTick) {
+    inTransition = false;
+    pauseRender = false;
+    resetTransitionAfterTick = false;
+  }
+
+  /*
   //try {
   if (runningAppName == "home") {
     if (millis() - updateHome > 300000) {
@@ -1797,6 +2362,10 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
   } else if (buttonDown == false) {
     runningApp();
   }
+/*/
+
+  //Serial.print(appTitle.c_str());
+  //Serial.println(appDatePub);
 
   //if (initalYPos > 210 && Touch_CTS816.y_point > 210 && tapHeld > 50 && inTransition == false && otherSwipe == false && watchSwipe == false) {
   //  openApp("recentApps", "UD", Touch_CTS816.y_point);
@@ -1812,10 +2381,10 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
 
   if (!inTransition && !pauseRender) {
     timeInTrans = millis();
-  } else if (millis() - timeInTrans > 5000) {
+  } else if (millis() - timeInTrans > 4000) {
     inTransition = false;
     pauseRender = false;
-    timeInTrans = millis();
+    timeInTrans = millis() + 30000;
   }
 
   if (runningAppName != "home") {
@@ -1834,82 +2403,112 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
         batVoltages.push_back(DEC_ADC_Read() * (3.3f / (1 << 12) * 2));
       }
     }
+
+
+
+
+    if (millis() - timeSinceLastButton > 200 && buttonPressCount > 0) {
+      if (batSaver == false) {
+        turboClock = true;
+        medClock = false;
+        vreg_set_voltage(VREG_VOLTAGE_1_30);
+        set_sys_clock_khz(400000, true);
+      }
+
+      if (buttonPressCount == 1) {
+        if (runningAppName == "main") {
+          openApp("appsPanel", "DU");
+        } else {
+          openApp("main", "RAND");
+        }
+      } else if (buttonPressCount == 2) {
+        openApp("recentApps", "DU");
+      } else if (buttonPressCount >= 3) {
+        if (!backgroundApps.empty()) {
+          openApp(backgroundApps.back(), "RAND");
+        }
+      }
+      buttonPressCount = 0;
+      timeSinceLastButton = millis();
+    }
+
+    if (butaction) {
+      butaction = false;
+      timeSinceLastButton = millis();
+      //was stuff herre,.. not anymore
+    }
   }
 
   tickTenTen++;
 
-  if (runningAppName == "CountSteps") {
-    autoClock = 3600000;
-  } else {
-    autoClock = 15000;
-  }
-
 
 
   //Handle Swipe up to home
-  if (tap) {  //flag==1
-              //  flag=0;
-    tapHeld++;
-    //tap=true;
-    idleTime = millis();
-    if (runningAppName != "home") {
-      if (watchSwipe == true && otherSwipe == false) {  // && pauseRender==false
-                                                        //pauseRender=true;
+  if (runningAppName != "home") {
+    if (tap) {  //flag==1
+                //  flag=0;
+      tapHeld++;
+      //tap=true;
+      idleTime = millis();
+      if (runningAppName != "home") {
+        if (watchSwipe == true && otherSwipe == false) {  // && pauseRender==false
+                                                          //pauseRender=true;
 
-        //if(tapHeld > 2){
-        Paint_DrawRectangle(45, 225, 195, 235, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-        //A little broke? //LCD_1IN28_DisplayWindows(45, max(0,Touch_CTS816.y_point-2), 195, min(Touch_CTS816.y_point+6,240), BlackImage);Paint_DrawRectangle(45, Touch_CTS816.y_point, 195, min(Touch_CTS816.y_point+7,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+          //if(tapHeld > 2){
+          Paint_DrawRectangle(45, 225, 195, 235, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+          //A little broke? //LCD_1IN28_DisplayWindows(45, max(0,Touch_CTS816.y_point-2), 195, min(Touch_CTS816.y_point+6,240), BlackImage);Paint_DrawRectangle(45, Touch_CTS816.y_point, 195, min(Touch_CTS816.y_point+7,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-        //tap=true;
-        //inTransition=true;//runningApp();
-        //pauseRender = true;
-        //while(tap){Paint_DrawRectangle(45, Touch_CTS816.y_point, 195, min(Touch_CTS816.y_point+12,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);LCD_1IN28_DisplayWindows(45, max(240,Touch_CTS816.y_point-5), 195, min(Touch_CTS816.y_point+13,240), BlackImage);if(flag==1){tap=true;flag=0;}else{tap=false;}DEV_Delay_ms(1);}
-        //////////inTransition=true;
-        //pauseRender=true;
-        //pauseRender = true;
-        //tap = false;
-        //}
-        if (Touch_CTS816.y_point < 70) {  //was 190
-          inTransition = false;
           //tap=true;
           //inTransition=true;//runningApp();
-          //pauseRender = true;//Paint_DrawRectangle(40, Touch_CTS816.y_point, 200, min(Touch_CTS816.y_point+6,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-          //while(tap){runningApp();LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);if(flag==1){tap=true;flag=0;}else{tap=false;}DEV_Delay_ms(1);}//if(flag==1){tap=true;flag=0;}else{tap=false;}
-          //inTransition=false;
-          //pauseRender = false;
-          tap = false;  //WAS ENABLEDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
-          if (std::find(backgroundApps.begin(), backgroundApps.end(), runningAppName) != backgroundApps.end()) {
-            backgroundApps.remove(runningAppName);
-          }
-          if (Touch_CTS816.y_point < 70) {  //check if drag passed point
-            if (runningAppName == "main") {
-              delay(10);
-              openApp("home", "RAND", Touch_CTS816.y_point);
-              delay(200);
-            } else {
-              delay(10);
-              openApp("main", "DU", 240);
+          //pauseRender = true;
+          //while(tap){Paint_DrawRectangle(45, Touch_CTS816.y_point, 195, min(Touch_CTS816.y_point+12,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);LCD_1IN28_DisplayWindows(45, max(240,Touch_CTS816.y_point-5), 195, min(Touch_CTS816.y_point+13,240), BlackImage);if(flag==1){tap=true;flag=0;}else{tap=false;}DEV_Delay_ms(1);}
+          //////////inTransition=true;
+          //pauseRender=true;
+          //pauseRender = true;
+          //tap = false;
+          //}
+          if (Touch_CTS816.y_point < 70) {  //was 190
+            inTransition = false;
+            //tap=true;
+            //inTransition=true;//runningApp();
+            //pauseRender = true;//Paint_DrawRectangle(40, Touch_CTS816.y_point, 200, min(Touch_CTS816.y_point+6,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+            //while(tap){runningApp();LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);if(flag==1){tap=true;flag=0;}else{tap=false;}DEV_Delay_ms(1);}//if(flag==1){tap=true;flag=0;}else{tap=false;}
+            //inTransition=false;
+            //pauseRender = false;
+            tap = false;  //WAS ENABLEDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+            if (std::find(backgroundApps.begin(), backgroundApps.end(), runningAppName) != backgroundApps.end()) {
+              backgroundApps.remove(runningAppName);
+            }
+            if (Touch_CTS816.y_point < 70) {  //check if drag passed point
+              if (runningAppName == "main") {
+                //delay(10);
+                openApp("home", "RAND", Touch_CTS816.y_point);
+                //delay(200);//200
+              } else {
+                //delay(10);
+                openApp("main", "DU", 240);
+              }
+              watchSwipe = false;
+              tap = false;
             }
             watchSwipe = false;
-            tap = false;
           }
-          watchSwipe = false;
+        }
+        if (Touch_CTS816.y_point > 225) {  //check if at bottom
+          watchSwipe = true;
+          //inTransition=true;
         }
       }
-      if (Touch_CTS816.y_point > 225) {  //check if at bottom
-        watchSwipe = true;
-        //inTransition=true;
+    } else {
+      tapHeld = 0;
+      initalYPos = -1;
+      //tap=false;
+      if (watchSwipe == true) {
+        inTransition = false;
+        //pauseRender = false;
       }
+      watchSwipe = false;
     }
-  } else {
-    tapHeld = 0;
-    initalYPos = -1;
-    //tap=false;
-    if (watchSwipe == true) {
-      inTransition = false;
-      //pauseRender = false;
-    }
-    watchSwipe = false;
   }
 
   if (tickTenTen > 100 || runningAppName == "home") {  //was 100, and 6    // || (runningAppName=="home" && tickTenTen > 1000) I forgot its not seconds  && runningAppName!="home") || (tickTenTen > 10000 && runningAppName=="home")
@@ -1924,13 +2523,13 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
           DEV_SET_PWM(0);
         }
         set_sys_clock_khz(32000, true);
-        delay(10);
+        delay(1);  //10
         vreg_set_voltage(VREG_VOLTAGE_0_90);
       }
     } else if (speedMode && batSaver == false) {
       DEV_SET_PWM(100);
       vreg_set_voltage(VREG_VOLTAGE_1_30);
-      delay(10);
+      delay(1);
       set_sys_clock_khz(400000, true);
       dontRunDimAgain = true;
     } else {
@@ -1941,28 +2540,49 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
 
   if (runningAppName == "home") {
     if (dontRunDimAgain == false) {
-      DEV_Delay_ms(500);
-    }
-  }
-
-  if (millis() - timeSinceLastButton > 300 && buttonPressCount >= 1) {
-    if (buttonPressCount == 1) {
-      if (runningAppName == "main") {
-        openApp("appsPanel", "DU");
-      } else {
-        openApp("main", "RAND");
+      //DEV_Delay_ms(1000);  //500 ///////////1000 05/19/24
+      if (runningAppName == "home") {
+        DEV_Delay_ms(1000);
+      } else {  // if (buttonDown == false) {
+        inTransition = false;
+        pauseRender = false;
+        runningApp();
       }
-    } else if (buttonPressCount == 2) {
-      openApp("recentApps", "DU");
+      if (runningAppName == "home") {  //THESE REPEATED COMMANDS ENSURE SMOOTH TRANSITION BETWEEN HOME AND MAIN, WHILST SAVING BATTERY WHEN IT CAN
+        DEV_Delay_ms(1000);
+      } else {  // if (buttonDown == false) {
+        inTransition = false;
+        pauseRender = false;
+        runningApp();
+      }
+      if (runningAppName == "home") {
+        DEV_Delay_ms(1000);
+      } else {  // if (buttonDown == false) {
+        inTransition = false;
+        pauseRender = false;
+        runningApp();
+      }
+      if (runningAppName == "home") {
+        DEV_Delay_ms(1000);
+      } else {  // if (buttonDown == false) {
+        inTransition = false;
+        pauseRender = false;
+        runningApp();
+      }
+      if (runningAppName == "home") {
+        DEV_Delay_ms(1000);
+      } else {  // if (buttonDown == false) {
+        inTransition = false;
+        pauseRender = false;
+        runningApp();
+      }
     }
-    buttonPressCount = 0;
+  } else if (runningAppName == "CountSteps") {
+    autoClock = 3600000;
+  } else {
+    autoClock = 15000;
   }
-
-  if (butaction) {
-    butaction = false;
-    //was stuff herre,.. not anymore
-  }
-
+  /*
   if (ticksSinceTap > 1 && tap) {  //was >1
     tap = false;
     //otherSwipe=false;//WAS TURNED OFF, for some reason
@@ -1973,18 +2593,24 @@ void loop() {  //IMPLEMENT A SYSTEM TO CHECK HOW LONG IT TOOK TO RUN, AND IF ITS
   } else if (tap) {
     ticksSinceTap++;
   }
-
+*/
   frameCount++;
-  if (millis() - lastfpstick >= 1000) {
+  if (millis() - lastfpstick >= 2000) {
     lastfpstick = millis();
-    fps = frameCount;
+    fps = (int)frameCount / 2;
     frameCount = 0;
   }
 
   oneTickPause = false;
-  if(!otherSwipe && !watchSwipe && pauseRender){
+  if (!otherSwipe && !watchSwipe && pauseRender) {
     pauseRender = false;
   }
+
+  if (buttonDown) {
+    timeSinceLastButton = millis();
+  }
+
+
   //Paint_DrawString_EN(53, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
 }
 
@@ -2002,10 +2628,10 @@ void Touch_INT_callback() {
   if (runningAppName == "home") {
     homeAppLowPower = 1000;
     //openApp(lastUsedAppName, "", 240);
-    openApp("main");
+    openApp("main", "RAND", 0);
     updateHome = 0;
   }
-  if (millis() - lastfpstick >= 3000 && runningAppName != "boot") {
+  if (millis() - lastfpstick >= 10000 && runningAppName != "boot") {
     Serial.println("Something broke..");
     saveToEEPROMX(2, 2);
     resetFunc();
@@ -2017,26 +2643,37 @@ void Touch_INT_callback() {
   }
 }
 
+int lastPress = 0;
+
 void buttonPress() {
+  timeSinceLastButton = millis();
+
   if (digitalRead(26) == HIGH) {
-    if (buttonDown == false) {
-      buttonDown = true;
-      if (runningAppName == "home") {
-        DEV_SET_PWM(100);
-        vreg_set_voltage(VREG_VOLTAGE_1_30);
-        delay(10);
-        set_sys_clock_khz(400000, true);
-        openApp("main");
-      } else {
-        butaction = true;
-      }
-      buttonPressCount += 1;
+    if (millis() - lastPress > 2) {  //10
+      lastPress = millis();
+      //buttonPressCount += 1;
       timeSinceLastButton = millis();
+      if (buttonDown == false) {
+        buttonDown = true;
+        //buttonPressCount += 1;
+        if (runningAppName == "home") {
+          DEV_SET_PWM(100);
+          vreg_set_voltage(VREG_VOLTAGE_1_30);
+          delay(1);
+          set_sys_clock_khz(400000, true);
+          openApp("main", "RAND", 0);
+          buttonPressCount = 0;
+        } else {
+          butaction = true;
+          buttonPressCount += 1;
+        }
+      }
     }
   } else {
     buttonDown = false;
+    lastPress = millis();
   }
-  if (millis() - lastfpstick >= 2500 && runningAppName != "boot") {
+  if (millis() - lastfpstick >= 10000 && runningAppName != "boot") {
     Serial.println("Something broke..");
     saveToEEPROMX(3, 2);
     resetFunc();
@@ -2045,27 +2682,29 @@ void buttonPress() {
     //set_sys_clock_khz(420000, true);
     openApp("main", "", 0);
   }
-  delay(2);
+  timeSinceLastButton = millis();
+
+  //delay(1);
   /*if(digitalRead(26)==HIGH){
-        if(buttonDown == false){
-            buttonDown=true;
-            if(runningAppName=="main"){
-                openApp("appsPanel");
-            } else if(runningAppName=="home"){
-                DEV_SET_PWM(100);
-                vreg_set_voltage(VREG_VOLTAGE_1_30);
-                set_sys_clock_khz(400000, true);
-                openApp("main");
-                //openApp("main");
-            } else{
-                openApp("main");
-            }
-        }
-    } else{
-        buttonDown=false;
-    }
-    */
-  Serial.println("PRESS");
+          if(buttonDown == false){
+              buttonDown=true;
+              if(runningAppName=="main"){
+                  openApp("appsPanel");
+              } else if(runningAppName=="home"){
+                  DEV_SET_PWM(100);
+                  vreg_set_voltage(VREG_VOLTAGE_1_30);
+                  set_sys_clock_khz(400000, true);
+                  openApp("main");
+                  //openApp("main");
+              } else{
+                  openApp("main");
+              }
+          }
+      } else{
+          buttonDown=false;
+      }
+      */
+  //Serial.println("PRESS");
 }
 
 

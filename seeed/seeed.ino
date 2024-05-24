@@ -13,8 +13,8 @@ const int receivePin = 4;  // Pin to receive data
 
 
 BLEService ledService("19B10000-E8F2-537E-4F6C-D104768A1214");  // Bluetooth® Low Energy LED Service
-BLEByteCharacteristic switchCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
-BLEStringCharacteristic switchResponseCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1215", BLENotify, 2560);  //256
+BLEByteCharacteristic switchCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite | BLENotify);
+BLEStringCharacteristic switchResponseCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1215", BLENotify, 256);  //256
 
 const int ledPin = LED_BUILTIN;  // pin to use for the LED
 
@@ -98,6 +98,7 @@ void sendTextO_L_D(String text) {  //const char* text) {
 
 int timeRec = 0;
 void sendText(String text) {  //new
+  bool msgFailed = false;
   digitalWrite(sendPin, LOW);
   delay(50);
   digitalWrite(D3, HIGH);
@@ -125,13 +126,18 @@ void sendText(String text) {  //new
       }
       //delay(3);  //3 so far best- was 1
       timeRec = millis();
-      while (digitalRead(receivePin) == last && millis() - timeRec < 200) {}
-      if (millis() - timeRec >= 200) {
+      while (digitalRead(receivePin) == last && millis() - timeRec < 200) {}  //200
+      if (millis() - timeRec >= 200) {                                        //20
         Serial.println("Timeout");
+        msgFailed = true;
+        return;
       }
       last = digitalRead(receivePin);
     }
     digitalWrite(sendPin, LOW);
+    if (msgFailed) {
+      return;
+    }
   }
   digitalWrite(sendPin, LOW);
 }
@@ -225,11 +231,11 @@ void setup() {
 
   BLE.setLocalName("Warp Smart Watch");
   BLE.setAdvertisedService(ledService);
-  ledService.addCharacteristic(switchCharacteristic);
   ledService.addCharacteristic(switchResponseCharacteristic);
+  ledService.addCharacteristic(switchCharacteristic);
   BLE.addService(ledService);
-  switchCharacteristic.writeValue(72);
   switchResponseCharacteristic.writeValue("Erm");
+  switchCharacteristic.writeValue(72);
   BLE.advertise();
 
   Serial.println("BLE LED Peripheral");
@@ -288,13 +294,15 @@ void loop() {
   if (central || debug) {
     Serial.print("Connected to central: ");
     if (central) {
+      switchResponseCharacteristic.setValue("DevStart");
       Serial.println(central.address());
     } else {
       Serial.println("debug");
     }
 
-    if(central.connected()){
+    if (central.connected()) {
       String receivedString = "{\"tite\": \"con\", \"text\": \"con\", \"app\": \"con\"}";
+      delay(100);
       sendText(receivedString);
     }
     while (central.connected() || debug) {
@@ -382,7 +390,7 @@ void loop() {
               //message += receivedText;
               //20 byte limit
               switchResponseCharacteristic.setValue(receivedTextMAIN);
-              Serial.print("Forwarding Data:");
+              Serial.print("Forwarding Data: ");
               Serial.println(receivedTextMAIN);
             }
           }
@@ -415,7 +423,7 @@ void loop() {
             }
           }
         }
-      } //after first discon
+      }  //after first discon
 
       String receivedString = "";  // Define a String to store the received characters
       Serial.println("Received values: ");
@@ -462,7 +470,7 @@ void loop() {
       //20 byte limit
       //to send data
       //Serial.println("Wack");
-    } //after second discon
+    }  //after second discon
 
     Serial.print(F("Disconnected from central: "));
     Serial.println(central.address());

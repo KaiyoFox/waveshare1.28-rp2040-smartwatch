@@ -8,6 +8,8 @@ extern int tapHeld;
 extern int CurTime;
 extern UWORD* BlackImage;
 extern std::list<std::string> backgroundApps;
+extern std::string keyboardData; //Occurs when Enter Pressed
+extern std::string keyboardTyped; //Just in case apps what access to curretnly typed
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
 void sendText(const char* text);
@@ -15,7 +17,7 @@ void sendText(const char* text);
 
 bool tapDown = false;
 
-std::string keyboardTyped = "";
+//std::string keyboardTyped = "";
 
 //EXAMPLES:
 //Paint_DrawString_EN(153, 19, (std::to_string(NUMBER) + "IF YOU WANT TO ADD ANYTHING ELSE").c_str(), &Font12, BLACK, GREEN);
@@ -54,7 +56,13 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
         keyStartX += 10;
       }
 
-      Paint_DrawRectangle(keyStartX, keyStartY, keyEndX, keyEndY, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(keyStartX, keyStartY, keyEndX, keyEndY, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+
+
+
+
+
 
       int letterX = keyStartX + (keyWidth - 12) / 2;
       int letterY = keyStartY + (keyHeight - 12) / 2;
@@ -63,7 +71,7 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
         letterX -= 20;
       }
 
-      Paint_DrawString_EN(letterX, letterY, row[i].c_str(), &Font16, WHITE, WHITE);
+      Paint_DrawString_EN(letterX, letterY, row[i].c_str(), &Font16, DARKGRAY, WHITE);
       if (Touch_CTS816.x_point >= keyStartX - 2 && Touch_CTS816.x_point <= keyStartX + keyWidth + 2 && Touch_CTS816.y_point >= keyStartY - 2 && Touch_CTS816.y_point <= keyStartY + keyHeight + 2) {
         if (tap && tapDown == false) {
           tapDown = true;
@@ -74,6 +82,10 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
           } else if (row[i] == "Space") {
             keyboardTyped += " ";
           } else if (row[i] == ">>") {
+            keyboardData = keyboardTyped;
+            keyboardTyped = "";
+            openApp(lastUsedAppName,"UD",Touch_CTS816.y_point);
+            /*
             std::string messag = firstItem;  //"8015744494;";
             messag += ";";
             for (char& c : keyboardTyped) {
@@ -81,19 +93,19 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
             }
             messag += keyboardTyped;
 
-            const char* message = messag.c_str();  // Convert std::string to const char*
-            Paint_DrawString_EN(50, 35, "Sending...", &Font16, BLACK, BLUE);
+            const char* message = messag.c_str();                             // Convert std::string to const char*
+            Paint_DrawString_EN(50, 35, "Sending...", &Font16, BLACK, BLUE);  // currently designed to only be used for Messages...
             LCD_1IN28_DisplayWindows(50, 35, 240, 51, BlackImage);
             sendText(message);
 
             openApp("Messages", "", 0);
 
             std::list<std::string> newNotification = { firstItem.c_str(), "messages", keyboardTyped, "UserSent" };
-
-            // Add the new notification to the notifications list
-            notifications.push_back(newNotification);
+            notifications.push_back(newNotification);  //Yes this is how we keep track of convos
+            
 
             keyboardTyped = "";
+            */
           } else {
             keyboardTyped += row[i].c_str();
           }
@@ -109,11 +121,15 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
 void keyboard() {
   if (startup) {
     startup = false;
-    pinMode(D27, OUTPUT);  //16
-    pinMode(D28, OUTPUT);  //18 CLOCK!!
-    pinMode(D26, OUTPUT);  //None, Tell other device to listen to me
-    digitalWrite(D28, LOW);
-    digitalWrite(D26, LOW);
+    keyboardTyped = "";
+    keyboardData = "";
+    //pinMode(D27, OUTPUT);  //16
+    //pinMode(D28, OUTPUT);  //18 CLOCK!!
+    //pinMode(D26, OUTPUT);  //None, Tell other device to listen to me
+    //digitalWrite(D28, LOW);
+    //digitalWrite(D26, LOW);
+    
+    
     //pinMode(rxPin, INPUT);
   }
   int keyWidth = 18;
@@ -153,7 +169,7 @@ void keyboard() {
   if (inTransition == false) {
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
     if (swipe("down", 70)) {
-      openApp("Messages", "UD", Touch_CTS816.y_point);
+      openApp(lastUsedAppName, "UD", Touch_CTS816.y_point);//"Messages"
     }
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 51, BlackImage);

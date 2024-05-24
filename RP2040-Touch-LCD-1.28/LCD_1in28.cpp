@@ -429,8 +429,93 @@ void LCD_1IN28_DisplayWindows(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend
   DEV_Digital_Write(LCD_DC_PIN, 1);
   for (j = Ystart; j < Yend; j++) {
     Addr = Xstart + j * LCD_1IN28_WIDTH;
-    SPI1.transfer((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
-    //DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], (Xend-Xstart)*2);
+    //SPI1.transfer((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
+    DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
+  }
+}
+
+void LCD_1IN28_DrawCircle(UWORD Xcenter, UWORD Ycenter, UWORD Xradius, UWORD Yradius, UWORD *Image) {
+  // display
+  UDOUBLE Addr = 0;
+  UWORD i, j;
+  double angle;
+
+  // Determine the boundaries of the circle
+  UWORD Xstart = min(240, max(0, Xcenter - Xradius));
+  UWORD Ystart = min(240, max(0, Ycenter - Yradius));
+  UWORD Xend = min(240, max(0, Xcenter + Xradius));
+  UWORD Yend = min(240, max(0, Ycenter + Yradius));
+
+  // Ensure boundaries are within screen limits
+  //if (Xstart < 0) Xstart = 0;
+  //if (Ystart < 0) Ystart = 0;
+  //if (Xend > LCD_1IN28_WIDTH) Xend = LCD_1IN28_WIDTH;
+  //if (Yend > LCD_1IN28_HEIGHT) Yend = LCD_1IN28_HEIGHT;
+
+  //LCD_1IN28_SetWindows(Xstart, Ystart, Xend, Yend);
+  //DEV_Digital_Write(LCD_DC_PIN, 1);
+  // Draw the circle
+  for (j = Ystart; j < Yend; j++) {
+    for (i = Xstart; i < Xend; i++) {
+      // Calculate distance from center to current point (i, j)
+      if (pow((i - Xcenter), 2) + pow((j - Ycenter), 2) > 0) {
+        double distance = sqrt(pow((i - Xcenter), 2) + pow((j - Ycenter), 2));
+        // Check if the distance is within the radius
+        if (distance <= Xradius && i > 0 && i < LCD_1IN28_WIDTH && j > 0 && j < LCD_1IN28_HEIGHT) {
+          Addr = (i) + (j)*LCD_1IN28_WIDTH;
+          LCD_1IN28_SetWindows(i, j, i + 1, j + 1);
+          DEV_Digital_Write(LCD_DC_PIN, 1);
+          DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], 4);
+        }
+      }
+    }
+  }
+}
+
+void LCD_1IN28_DisplayCircle(UWORD XMiddle, UWORD YMiddle, UWORD Radius, UWORD *Image) {
+  // Display
+  UDOUBLE Addr = 0;
+
+  // Define the bounds of the circle
+  UWORD Xstart = XMiddle - Radius;
+  UWORD Xend = XMiddle + Radius;
+  UWORD Ystart = YMiddle - Radius;
+  UWORD Yend = YMiddle + Radius;
+
+  // Set the display windows
+  //LCD_1IN28_SetWindows(Xstart, Ystart, Xend, Yend);
+
+  // Set the DC pin to 1 for data transmission
+  DEV_Digital_Write(LCD_DC_PIN, 1);
+
+  // Iterate over the circular area
+  UWORD j;
+  for (j = Ystart; j < Yend; j++) {
+    //Addr = Xstart + j * LCD_1IN28_WIDTH;
+    //int discriminant = ((Radius-XMiddle)*(Radius-XMiddle))+(2*XMiddle*1)-((y-Yend)*(y-Yend));
+    UWORD x1 = Xstart;                                 //XMiddle - sqrt(discriminant);
+    UWORD x2 = (sin(j + YMiddle) * Radius) + XMiddle;  //sqrt(discriminant);
+
+    Serial.print(x1);
+    Serial.print("a");
+    Serial.println(x2);
+    //for (UWORD x = Xstart; x < Xend; x++) {
+    // Calculate the distance from the current pixel to the center of the circle
+    //int distance = sqrt(pow(x - XMiddle, 2) + pow(y - YMiddle, 2));
+
+    // Check if the pixel is within the circle
+    //if (distance <= Radius) {
+    //Addr = min(max(x1, 0), 240) + (min(max(y, 0), 240) * LCD_1IN28_WIDTH);
+    Addr = x2 + j * LCD_1IN28_WIDTH;
+    // Ensure the rendering coordinates are within bounds
+    //Addr = min(Addr, (UDOUBLE)(LCD_1IN28_WIDTH * LCD_1IN28_HEIGHT));
+    //Addr = max(Addr, (UDOUBLE)0);
+    LCD_1IN28_SetWindows(x1, Ystart, x2, j);
+    DEV_Digital_Write(LCD_DC_PIN, 1);
+    DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], (x2 - x1) * 2);  //(Xend-Xstart)*2
+                                                                  //DEV_SPI_WriteByte((uint8_t)&Image[Addr]);
+                                                                  //}
+                                                                  //}
   }
 }
 

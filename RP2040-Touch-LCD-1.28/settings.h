@@ -16,8 +16,18 @@ extern int CurTime;
 extern UWORD *BlackImage;
 extern const char *message;
 extern std::list<std::string> backgroundApps;
+extern std::map<std::string, App *> appsV2;
 extern bool aod;
 extern bool BLEconnected;
+extern std::list<std::string> appPermissions;
+extern std::string appTitle;    // Title
+extern std::string appDesc;     // Description
+extern std::string appPub;      // Publisher
+extern std::string appOthInfo;  // Other Info
+extern float appVersion;        // Version
+extern int appDatePub;          // Unix Timestamp
+extern std::string appHash;     // More Unique Identifier
+
 
 struct Option {
   std::string name;
@@ -33,8 +43,12 @@ void resetFunc();
 void runNextService();
 void runAllServices();
 std::string internet_get(std::string url);
+void internet_post(std::string toilet, std::string data);
 bool button(int x, int y, const char *text, sFONT *Font, UWORD Color_Foreground, UWORD Color_Background, int size);
+std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible);
 #endif
+
+std::string clickedAppName = "";
 
 uint16_t rgb_to_uint16(uint8_t r, uint8_t g, uint8_t b) {
   // Ensure values are within 0-255 range
@@ -58,9 +72,10 @@ void uint16_to_rgb(uint16_t color, uint8_t &r, uint8_t &g, uint8_t &b) {
 std::list<Option> optionsList = {
   { "Network", "network" },
   { "Display", "display" },
-  { "Battery", "battery" },
-  { "Time", "set_time" },
   { "Customize", "customization" },
+  { "Apps", "v2apps" },
+  { "Battery", "battery" },
+  //{ "Time", "set_time" }, Move to Systm
   { "System", "system" }
 };
 
@@ -82,11 +97,11 @@ void settings() {
     scrollY = 1;
     startup = false;
     page = "";
-    scrollFunction(5, {}, true);
+    scrollFunction(6, {}, true);
     LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
   }
   if (page == "") {
-    scrollFunction(5, {}, true);
+    scrollFunction(6, {}, true);
     yp = 50 + (-scrollY);
 
     int index = 0;
@@ -94,6 +109,7 @@ void settings() {
       if (button(10, yp + (50 * index), option.name.c_str(), &Font20, DARKGRAY, WHITE, 1)) {
         page = option.value;
         scrollY = 0;
+        clickedAppName = "";
         break;
       };
       //Paint_DrawRectangle(10, yp + (40 * index), 180, yp + 30 + (40 * index), DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -123,26 +139,26 @@ void settings() {
     //if (inTransition == false && watchSwipe == false && otherSwipe == false && tap == true && tapHeld == 1) {
     //  if (Touch_CTS816.x_point >= 10 && Touch_CTS816.x_point < 180) {
     //    if (Touch_CTS816.y_point >= yp && Touch_CTS816.y_point < yp + 30) {
-    if(BLEconnected){
+    if (BLEconnected) {
       Paint_DrawString_EN(25, yp, "Connected", &Font12, BLACK, GREEN);
-      if (button(10, yp+15, "Disconnect", &Font20, DARKGRAY, RED, 1)) {
+      if (button(10, yp + 15, "Disconnect", &Font20, DARKGRAY, RED, 1)) {
         //Paint_DrawRectangle(10, yp, 180, yp + 30, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         //Paint_DrawString_EN(20, yp + 5, "Disconnecting", &Font20, DARKGRAY, WHITE);
-        button(10, yp+15, "Disconnected", &Font20, DARKGRAY, RED, 1);
-        LCD_1IN28_DisplayWindows(10, yp+15, 180, yp+65, BlackImage);
+        button(10, yp + 15, "Disconnected", &Font20, DARKGRAY, RED, 1);
+        LCD_1IN28_DisplayWindows(10, yp + 15, 180, yp + 65, BlackImage);
         std::string test = "disconnect";
         message = test.c_str();
         sendText(message);
         BLEconnected = false;
         //Paint_DrawRectangle(10, yp, 180, yp + 30, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         //Paint_DrawString_EN(20, yp + 5, "Disconnect", &Font20, DARKGRAY, WHITE);
-        button(10, yp+15, "Disconnect", &Font20, DARKGRAY, RED, 1);
+        button(10, yp + 15, "Disconnect", &Font20, DARKGRAY, RED, 1);
         //}
         //}
       }
-    } else{
+    } else {
       Paint_DrawString_EN(25, yp, "Disconnected", &Font12, BLACK, RED);
-      Paint_DrawString_EN(15, yp+15, "Listening...", &Font16, BLACK, WHITE);
+      Paint_DrawString_EN(15, yp + 15, "Listening...", &Font16, BLACK, WHITE);
     }
 
   } else if (page == "display") {
@@ -228,21 +244,21 @@ void settings() {
 
       if (button(10, yp, "Change Main Color", &Font12, DARKGRAY, WHITE, 1)) {
         valueChanging = 1;
-        tap=false;
+        tap = false;
         delay(6);
         uint16_to_rgb(deviceMainColorTheme, r, g, b);
       }
 
       if (button(10, yp + 62, "Change Second Color", &Font12, DARKGRAY, WHITE, 1)) {
         valueChanging = 2;
-        tap=false;
+        tap = false;
         delay(6);
         uint16_to_rgb(deviceSecondColorTheme, r, g, b);
       }
 
       if (button(10, yp + 124, "Change Third Color", &Font12, DARKGRAY, WHITE, 1)) {
         valueChanging = 3;
-        tap=false;
+        tap = false;
         delay(6);
         uint16_to_rgb(deviceThirdColorTheme, r, g, b);
       }
@@ -256,7 +272,10 @@ void settings() {
     Paint_DrawString_EN(25, yp + 50 + 13, "off AOD and limits", &Font12, BLACK, WHITE);
     Paint_DrawString_EN(25, yp + 50 + 13 + 13, "peak clock speed.", &Font12, BLACK, WHITE);
   } else if (page == "system") {
-    yp = 45;
+    //yp = 45;
+    scrollFunction(4, {}, true);
+    yp = 50 + (-scrollY);
+
     if (latest == "") {
       textT = "Check VERS";
       //Paint_DrawString_EN(20, yp + 5, "Check VERS", &Font20, DARKGRAY, WHITE);
@@ -265,11 +284,16 @@ void settings() {
       //Paint_DrawString_EN(20, yp + 5, latest.c_str(), &Font20, DARKGRAY, WHITE);
     }
 
-    if (button(10, yp + 50, "Run ALL-SRV", &Font20, DARKGRAY, WHITE, 1)) {
+    if (button(10, yp + 50, "Set Time", &Font20, DARKGRAY, WHITE, 1)) {
+      page = "set_time";
+      //openApp("Set Time", "", 0);
+    }
+
+    if (button(10, yp + 50 + 50, "Run SRV'S", &Font20, DARKGRAY, WHITE, 1)) {
       runAllServices();
     }
 
-    if (button(10, yp + 50 + 50, "Restart", &Font20, DARKGRAY, WHITE, 1)) {
+    if (button(10, yp + 50 + 50 + 50, "Restart", &Font20, DARKGRAY, WHITE, 1)) {
       resetFunc();
     }
 
@@ -278,6 +302,7 @@ void settings() {
       button(10, yp, "Checking...", &Font20, DARKGRAY, WHITE, 1);
       LCD_1IN28_DisplayWindows(10, yp, 180, yp + 45, BlackImage);
       //Paint_DrawRectangle(10, yp, 180, yp + 30, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      internet_post("watch", "UWU");
       latest = internet_get("watch");
       std::string textT = latest;
       button(10, yp, textT.c_str(), &Font20, DARKGRAY, WHITE, 1);
@@ -285,20 +310,73 @@ void settings() {
       tap = false;
       tapHeld = 0;
     }
+  } else if (page == "v2apps") {
+    yp = 50 + (-scrollY);
+    int buttonHeight = 50;
+
+    if (clickedAppName == "") {
+      scrollFunction(appsV2.size(), {}, true);
+      for (const auto &[appName, appPtr] : appsV2) {
+        if (button(10, yp, appName.c_str(), &Font20, DARKGRAY, WHITE, 1)) {
+          clickedAppName = appName;
+        }
+        yp += buttonHeight + 10;  // Move the next button down
+      }
+    } else {
+      scrollFunction(14, {}, true);
+      std::function<void()> appSysConfig;
+      auto itNew = appsV2.find(clickedAppName);
+      if (itNew != appsV2.end()) {
+        appSysConfig = [instance = itNew->second]() {
+          instance->sysConfig();
+        };
+        appSysConfig();
+        Paint_DrawString_EN(20, yp + 5 + (15 * 0), "App Title:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 1), appTitle.c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 2), "App Description:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 3), appDesc.c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 4), "App Publisher:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 5), appPub.c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 6), "Other App Info:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 7), appOthInfo.c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 8), "App Version:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 9), std::to_string(appVersion).c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 10), "App Date Published:", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 11), std::to_string(appDatePub).c_str(), &Font12, BLACK, GRAY);
+
+        Paint_DrawString_EN(20, yp + 5 + (15 * 12), "App Hash", &Font12, BLACK, WHITE);
+        Paint_DrawString_EN(20, yp + 5 + (15 * 13), appHash.c_str(), &Font12, BLACK, GRAY);
+      } else {
+        Paint_DrawString_EN(20, yp + 5, "Error Getting Info", &Font12, BLACK, WHITE);
+      }
+    }
   }
 
 
 
   if (inTransition == false) {
-    if (swipe("right", 70)) {
-      page = "";
+    if (page != "") {
+      if (swipe("right", 70)) {
+        if (clickedAppName == "") {
+          page = "";
+          scrollY = 1;
+        }
+        clickedAppName = "";
+        //scrollFunction(5, {}, true);
+        //LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
+      }
     }
     if (pauseRender == false) {
-      if (page == "customization") {  // && valueChanging != 0
-        LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
-      } else {
-        LCD_1IN28_DisplayWindows(0, 0, 180, 240, BlackImage);
-      }
+      //if (page == "customization" || page == "system" || page == "battery" || page == "display" || page == "network") {  // && valueChanging != 0
+      LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
+      //} else {
+      //  LCD_1IN28_DisplayWindows(0, 0, 180, 240, BlackImage);
+      //}
     }
 
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar

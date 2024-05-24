@@ -31,6 +31,7 @@
 #define _IMAGEDATA_H_
 
 extern const unsigned char RunningPerson[];
+extern const unsigned char Sun[];
 
 extern const unsigned char Signal816[];
 extern const unsigned char Msg816[];

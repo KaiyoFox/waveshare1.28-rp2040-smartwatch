@@ -328,6 +328,21 @@ void Paint_DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
   }
 }
 
+void Paint_DrawHorizontalLine(UWORD Xstart, UWORD Xend, UWORD Y, UWORD Color) {
+  if (Xstart > Paint.Width || Xend > Paint.Width || Y > Paint.Height) {
+    Debug("Paint_DrawHorizontalLine: Input exceeds the normal display range\r\n");
+    return;
+  }
+
+  // Increment direction, 1 is positive, -1 is counter;
+  int XAddway = Xstart < Xend ? 1 : -1;
+
+  // Draw pixels along the horizontal line
+  for (UWORD Xpoint = Xstart; Xpoint != Xend; Xpoint += XAddway) {
+    Paint_DrawPoint(Xpoint, Y, Color, DOT_PIXEL_1X1, DOT_STYLE_DFT);
+  }
+}
+
 /******************************************************************************
 function: Draw a rectangle
 parameter:
@@ -496,44 +511,44 @@ void Paint_DrawCircleTrans(UWORD Xcenter, UWORD Ycenter, UWORD Radius,
 
 
 void Paint_DrawEdgeEffect() {
-    // Define parameters
-    UWORD Xcenter = 120;  // Center X coordinate of the circle
-    UWORD Ycenter = 120;  // Center Y coordinate of the circle
-    UWORD Radius = 100;   // Radius of the circle
-    int Xstart = -1;      // Top-left X coordinate of the bounding box
-    int Ystart = -1;      // Top-left Y coordinate of the bounding box
-    int Xend = 241;       // Bottom-right X coordinate of the bounding box
-    int Yend = 241;       // Bottom-right Y coordinate of the bounding box
-    uint8_t transparency = 100;
-    DOT_PIXEL Line_width = DOT_PIXEL_1X1;
-    DRAW_FILL Draw_Fill = DRAW_FILL_EMPTY;
+  // Define parameters
+  UWORD Xcenter = 120;  // Center X coordinate of the circle
+  UWORD Ycenter = 120;  // Center Y coordinate of the circle
+  UWORD Radius = 100;   // Radius of the circle
+  int Xstart = -1;      // Top-left X coordinate of the bounding box
+  int Ystart = -1;      // Top-left Y coordinate of the bounding box
+  int Xend = 241;       // Bottom-right X coordinate of the bounding box
+  int Yend = 241;       // Bottom-right Y coordinate of the bounding box
+  uint8_t transparency = 100;
+  DOT_PIXEL Line_width = DOT_PIXEL_1X1;
+  DRAW_FILL Draw_Fill = DRAW_FILL_EMPTY;
 
-    // Iterate through each pixel within the bounding box of the circle
-    int Ypoint;
-    for (Ypoint = Ystart; Ypoint <= Yend; Ypoint++) {
-        if (Ypoint >= 0 && Ypoint < Paint.Height) {
-            int Xpoint;
-            for (Xpoint = Xstart; Xpoint <= Xend; Xpoint++) {
-                // Calculate the distance between the current pixel and the center of the circle
-                int distanceSquared = (Xpoint - Xcenter) * (Xpoint - Xcenter) + (Ypoint - Ycenter) * (Ypoint - Ycenter);
-                // Check if the pixel is outside the radius of the circle
-                if (distanceSquared >= (Radius * Radius)) {
-                    // Calculate the transparency based on the distance from the center of the circle
-                    float normalizedDistance = sqrtf((float)distanceSquared) - Radius;
-                    if (normalizedDistance < 0) normalizedDistance = 0;
-                    float pixelTransparency = (normalizedDistance / Radius) * transparency;
-                    // Get the color already present at the pixel
-                    if (Xpoint >= 0 && Xpoint < Paint.Width) {
-                        UWORD existingColor = Paint_GetPixel(Xpoint, Ypoint);
-                        // Darken the color based on transparency
-                        UWORD newColor = DarkenColor(existingColor, pixelTransparency);
-                        // Draw the pixel with the darker color
-                        Paint_DrawPoint(Xpoint, Ypoint, newColor, Line_width, DOT_STYLE_DFT);
-                    }
-                }
-            }
+  // Iterate through each pixel within the bounding box of the circle
+  int Ypoint;
+  for (Ypoint = Ystart; Ypoint <= Yend; Ypoint++) {
+    if (Ypoint >= 0 && Ypoint < Paint.Height) {
+      int Xpoint;
+      for (Xpoint = Xstart; Xpoint <= Xend; Xpoint++) {
+        // Calculate the distance between the current pixel and the center of the circle
+        int distanceSquared = (Xpoint - Xcenter) * (Xpoint - Xcenter) + (Ypoint - Ycenter) * (Ypoint - Ycenter);
+        // Check if the pixel is outside the radius of the circle
+        if (distanceSquared >= (Radius * Radius)) {
+          // Calculate the transparency based on the distance from the center of the circle
+          float normalizedDistance = sqrtf((float)distanceSquared) - Radius;
+          if (normalizedDistance < 0) normalizedDistance = 0;
+          float pixelTransparency = (normalizedDistance / Radius) * transparency;
+          // Get the color already present at the pixel
+          if (Xpoint >= 0 && Xpoint < Paint.Width) {
+            UWORD existingColor = Paint_GetPixel(Xpoint, Ypoint);
+            // Darken the color based on transparency
+            UWORD newColor = DarkenColor(existingColor, pixelTransparency);
+            // Draw the pixel with the darker color
+            Paint_DrawPoint(Xpoint, Ypoint, newColor, Line_width, DOT_STYLE_DFT);
+          }
         }
+      }
     }
+  }
 }
 
 
@@ -551,8 +566,10 @@ void Paint_DrawRectangle(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
 
   if (Draw_Fill) {
     UWORD Ypoint;
-    for (Ypoint = Ystart; Ypoint < Yend; Ypoint++) {
-      Paint_DrawLine(Xstart, Ypoint, Xend, Ypoint, Color, Line_width, LINE_STYLE_SOLID);
+    //for (Ypoint = Ystart; Ypoint < Yend; Ypoint++) {
+    for (UWORD y = Ystart; y <= Yend; y++) {
+      Paint_DrawHorizontalLine(Xstart, Xend, y, Color);
+      //Paint_DrawLine(Xstart, Ypoint, Xend, Ypoint, Color, Line_width, LINE_STYLE_SOLID);
     }
   } else {
     Paint_DrawLine(Xstart, Ystart, Xend, Ystart, Color, Line_width, LINE_STYLE_SOLID);

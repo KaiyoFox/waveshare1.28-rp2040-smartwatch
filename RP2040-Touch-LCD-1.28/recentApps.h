@@ -30,22 +30,24 @@ uint16_t findTextColor(const std::string& text);
 
 #endif
 
-int totalHeightRecents = 0;
+int totalHeightRecents = -1;
 bool recentAppTappedOn = false;
 
 void recentApps() {
   if (startup) {
     openingAnApp = false;
+    recentAppTappedOn = false;
     scrollY = 5;
 
-    if (totalHeightRecents == -1) {
-      std::vector<int> itemHeightsRecents;
+    //if (totalHeightRecents == -1) {
+    if (true) {  //recent apps changes often
+      //std::vector<int> itemHeightsRecents;
       totalHeightRecents = 0;
       for (auto const& key : backgroundApps) {
         if (std::find(systemApps.begin(), systemApps.end(), key) == systemApps.end()) {
           int itemHeight = appSize + spacing;
           totalHeightRecents += itemHeight;
-          itemHeightsRecents.push_back(itemHeight);
+          //itemHeightsRecents.push_back(itemHeight);
         }
       }
     }
@@ -55,15 +57,15 @@ void recentApps() {
   scrollFunction(visibleCount, {}, true);
   visibleCount = 0;
 
-  int scrollYModded = (scrollY / 240.0) * (totalHeightRecents + 20);
+  int scrollYModded = ((long)scrollY / 240.0) * (totalHeightRecents + 20.0);
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
 
-  for (auto it = std::next(backgroundApps.begin(), startIndex); it != backgroundApps.end(); ++it) {
+  for (auto it = backgroundApps.rbegin(); it != backgroundApps.rend(); ++it) {
     const std::string& key = *it;
     if (std::find(systemApps.begin(), systemApps.end(), key) == systemApps.end()) {
       int x = startX;
       int y = 20 + startY + (visibleCount + startIndex) * (appSize + spacing) - scrollYModded;
-      if (y > -appSize && y < 240 && openingAnApp == false) {
+      if (y > -appSize && y < 240 && openingAnApp == false && recentAppTappedOn == false) {
         // Drawing rectangles for app design
         Paint_DrawRectangle(x + 18, y + 0, x + 123, y + 1, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawRectangle(x + 12, y + 1, x + 128, y + 2, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -118,9 +120,14 @@ void recentApps() {
               if (tapHeld <= 1) {
                 tap = false;
                 tapHeld = 999;
+                if (!key.empty()) {
+                  backgroundApps.remove(key);     // Remove the app from its current position
+                  backgroundApps.push_back(key);  // Move it to the bottom
+                }
                 openApp(key, "", 0);
                 tap = false;
                 recentAppTappedOn = true;
+                openingAnApp = true;
                 oneTickPause = true;
               }
             }
@@ -151,7 +158,8 @@ void recentApps() {
       openApp(lastUsedAppName, "UD", Touch_CTS816.y_point);
     }
     if (pauseRender == false && recentAppTappedOn == false) {
-      LCD_1IN28_DisplayWindows(startX - 2, 0, 180, 240, BlackImage);
+      //LCD_1IN28_DisplayWindows(startX - 2, 0, 180, 240, BlackImage);
+      LCD_1IN28_DisplayWindows(startX - 2, 0, 240, 240, BlackImage);
     }
   }
 }

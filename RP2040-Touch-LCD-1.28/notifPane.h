@@ -10,6 +10,8 @@ extern std::string runningAppName;
 extern int tapHeld;
 extern bool oneTickPause;
 extern UWORD *BlackImage;
+typedef void (*AppPtr)();
+extern std::map<std::string, AppPtr> apps;
 extern std::list<float> batVoltages;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
@@ -24,9 +26,9 @@ float result;
 int tappedNotif = -1;
 
 std::list<std::list<std::string>> notifications = {
-  { "MRRBEAASST", "AppToUse", "Idk some stupid content", "appSpecificData" },
-  { "TESTPHONENUMBER", "messages", "SomeContent", "Contact" },
-  { "TESTPHONENUMBER2", "messages", "CONTENT2", "Person" },
+  { "Title", "App", "Content", "AppSpecificData" },
+  { "Contact1", "Messages", "SomeContent", "Number" },
+  { "Contact2", "Messages", "CONTENT2", "Number" },
 };
 
 std::list<std::list<std::string>> uniqueNotifications;
@@ -106,10 +108,13 @@ void notifPane() {
           tappedNotif = index;
           oneTickPause = true;
           notifHeight = -45;
-          if (openAppWith == "messages") {
-            openApp("Messages", "LR", 0);
+          auto it = apps.find(openAppWith);
+          if (it != apps.end()) {
+            //if (openAppWith == "messages") {
+            //openApp("Messages", "LR", 0);
+            openApp(openAppWith, "RL", 240);  //idea: Instead alawys display preiewNotif, and if there is an app for it, then add a Open In App button, and go from there, so we have notif content, and notif data (in app)
           } else {
-            openApp("previewNotif", "LR", 0);
+            openApp("previewNotif", "RL", 240);
           }
         }
       }
@@ -137,7 +142,8 @@ void notifPane() {
       }
       if (pauseRender == false) {
         if (oneTickPause == false) {
-          LCD_1IN28_DisplayWindows(notifX - 1, 0, 180, 180, BlackImage);
+          //LCD_1IN28_DisplayWindows(notifX - 1, 0, 180, 180, BlackImage);
+          LCD_1IN28_DisplayWindows(notifX - 1, 0, 240, 240, BlackImage);
         }
       }
 

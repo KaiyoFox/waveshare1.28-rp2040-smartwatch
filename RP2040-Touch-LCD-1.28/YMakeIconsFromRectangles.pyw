@@ -769,7 +769,7 @@ while running:
     elif(AEtriggered and resizeToValue!=-1):
         pygame.draw.rect(screen, (120,255,120), pygame.Rect(0, 50, resizeToValue*(240/14), 50))
         pygame.draw.rect(screen, (120,50,120), pygame.Rect(0, 50, 240, 50), 5)
-    elif(AEtriggered and resizeToValue==-1):
+    elif(AEtriggered and resizeToValue==-1 and rectangleToResize['type']=='text'):
         fontSiz=48
         font = pygame.font.Font(None, int(fontSiz*1.5))
         text_surface = font.render(str(rectangleToResize['colorMode']), False, (255,255,120))  # Temporary text color

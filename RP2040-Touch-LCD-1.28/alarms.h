@@ -53,7 +53,7 @@ void setAlarm() {
 
 int alarmHour = -1;               // Initialize alarm hour to -1 indicating alarm not set
 int alarmMinute = -1;             // Initialize alarm minute to -1 indicating alarm not set
-int SELalarmHour = 0;            // Initialize alarm hour to -1 indicating alarm not set
+int SELalarmHour = 0;             // Initialize alarm hour to -1 indicating alarm not set
 int SELalarmMinute = 0;           // Initialize alarm minute to -1 indicating alarm not set
 int btnSizeAlarm = 40;            // Adjust button size as needed
 int buttonMargin = 10;            // Adjust button margin as needed
@@ -75,7 +75,7 @@ void alarms() {
 
     unsigned long elapsed_time = millis() + CurTime;  // + 46800000 + 2400000
     unsigned int hours = (elapsed_time % 86400000) / 3600000;
-    unsigned int minutes = (elapsed_time % 3600000);
+    unsigned int minutes = (elapsed_time % 3600000) / 60000;
 
     //if (hours == 0) {
     //  hours = 12;
@@ -84,26 +84,33 @@ void alarms() {
     //  alarmHour = 12;
     //}
 
-////////////////////////////////
+    ////////////////////////////////
     std::string elementToCheck = std::to_string(alarmHour) + ":" + modifyString(std::to_string(alarmMinute));
-    if (hours == (int)alarmHour && minutes == (int)alarmMinute) { //Alarm Iteslf
+    if (hours == (int)alarmHour && minutes == (int)alarmMinute) {  //Alarm Iteslf
       Paint_DrawString_EN(20, 100, "Alarm ASDASDASDASDASD", &Font16, BLACK, WHITE);
       for (auto it = notifications.begin(); it != notifications.end(); ++it) {
         auto inner_it = it->begin();  // Start from the beginning of the inner list
         if (*inner_it == elementToCheck) {
           ++inner_it;  // Move to the second element
-          if (inner_it != it->end() && *inner_it == "alarms") {
+          if (inner_it != it->end() && *inner_it == "Alarms") {
             notifications.erase(it);  // Erase the outer list
             break;                    // Stop iterating after removing the first occurrence
           }
         }
       }
-    } else if (hours <= (int)alarmHour && hours >= (int)alarmHour-1 && minutes < (int)alarmMinute) { //Pre Alarm
+    } else if ((hours == alarmHour && minutes < alarmMinute) || (hours == (alarmHour - 1) && minutes >= alarmMinute)) {
       if (isElementNotInNotifications(elementToCheck)) {
-        notifications.push_back({ elementToCheck.c_str(), "alarms", "", (elementToCheck + " Alarm goes off soon.").c_str() });
+        notifications.push_back({ elementToCheck, "Alarms", "", (elementToCheck + " Alarm goes off soon.").c_str() });
+        digitalWrite(D28, HIGH);
+        delay(250);
+        digitalWrite(D28, LOW);
+        delay(200);
+        digitalWrite(D28, HIGH);
+        delay(200);
+        digitalWrite(D28, LOW);
       }
     }
-////////////////////////////////
+    ////////////////////////////////
   } else {
     Paint_DrawRectangle(10, 50, 10 + btnSizeAlarm, 50 + btnSizeAlarm, buttonBackgroundColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);     // UP HR
     Paint_DrawRectangle(10, 100, 10 + btnSizeAlarm, 100 + btnSizeAlarm, buttonBackgroundColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);   // DN HR
@@ -128,8 +135,8 @@ void alarms() {
 
       // Check if tap is within the DOWN button region
       if (Touch_CTS816.x_point >= 10 && Touch_CTS816.x_point <= 10 + btnSizeAlarm && Touch_CTS816.y_point >= 100 && Touch_CTS816.y_point <= 100 + btnSizeAlarm) {
-        if (SELalarmHour == -1) SELalarmHour = 0;     // Initialize hour if not set
-        SELalarmHour = (SELalarmHour - 1) % 24;  // Decrement hour and wrap around if necessary
+        if (SELalarmHour == -1) SELalarmHour = 0;  // Initialize hour if not set
+        SELalarmHour = (SELalarmHour - 1) % 24;    // Decrement hour and wrap around if necessary
       }
 
       if (Touch_CTS816.x_point >= 70 && Touch_CTS816.x_point <= 70 + btnSizeAlarm && Touch_CTS816.y_point >= 50 && Touch_CTS816.y_point <= 50 + btnSizeAlarm) {
@@ -139,8 +146,8 @@ void alarms() {
 
       // Check if tap is within the DOWN button region
       if (Touch_CTS816.x_point >= 70 && Touch_CTS816.x_point <= 70 + btnSizeAlarm && Touch_CTS816.y_point >= 100 && Touch_CTS816.y_point <= 100 + btnSizeAlarm) {
-        if (SELalarmMinute == -1) SELalarmMinute = 0;     // Initialize hour if not set
-        SELalarmMinute = (SELalarmMinute - 1) % 60;  // Decrement hour and wrap around if necessary
+        if (SELalarmMinute == -1) SELalarmMinute = 0;  // Initialize hour if not set
+        SELalarmMinute = (SELalarmMinute - 1) % 60;    // Decrement hour and wrap around if necessary
       }
 
       // Check if tap is within the SET button region

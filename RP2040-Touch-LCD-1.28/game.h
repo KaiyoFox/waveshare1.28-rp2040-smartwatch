@@ -224,7 +224,7 @@ void addRandomNumber(std::vector<std::vector<int>> &board) {
   }
 }
 
-
+//Somneone make tetris lol
 
 void game() {
   renderBoard();

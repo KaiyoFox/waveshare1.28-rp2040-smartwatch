@@ -191,19 +191,19 @@ parameter:
 Info:
 ******************************************************************************/
 uint8_t DEV_Module_Init(void) {
-  Serial.begin(11520);  //115200
+  Serial.begin(115200);  //11520
   DEV_Delay_ms(100);
   // GPIO Config
   DEV_GPIO_Init();
 
   // SPI Config
-  SPI1.setRX(LCD_MISO_PIN);
+  SPI1.setRX(LCD_MISO_PIN);  //shall I consider SPI for seeed to waveshare communication? seems fast
   SPI1.setCS(LCD_CS_PIN);
   SPI1.setSCK(LCD_CLK_PIN);
   SPI1.setTX(LCD_MOSI_PIN);
   SPI1.begin();
   //SPI1.beginTransaction(SPISettings(66500000, MSBFIRST, SPI_MODE0));
-  SPI1.beginTransaction(SPISettings(60000000, MSBFIRST, SPI_MODE0));
+  SPI1.beginTransaction(SPISettings(65000000, MSBFIRST, SPI_MODE3));
   //SPI1.beginTransaction(SPISettings(800000000, MSBFIRST, SPI_MODE0));  // Adjusted clock frequency to 80 MHz
 
 
