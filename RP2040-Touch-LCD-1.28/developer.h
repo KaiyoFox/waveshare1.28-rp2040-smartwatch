@@ -36,6 +36,11 @@ extern UWORD *BlackImage;
 extern std::list<std::string> backgroundApps;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
+bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size);
+int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height);
+bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);
+bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);
+void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 #endif
 
 //EXAMPLES:
@@ -2763,7 +2768,17 @@ void developer() {
     Paint_DrawString_EN(53, 190, (std::to_string(CurTime) + " CurTime").c_str(), &Font12, BLACK, GREEN);
     Paint_DrawString_EN(53, 210, (activeDir + " activeDir").c_str(), &Font12, BLACK, GREEN);
   } else if (currentPage == 3) {
-    Paint_DrawString_EN(53, 50, (std::to_string(buttonDown) + " buttonDown").c_str(), &Font12, BLACK, GREEN);
+    toggle(50, 10, GRAY, BLUE, "Id", 30);
+
+    radio(50, 20 + 30, GRAY, LIGHTBLUE, "A", 20, "Group1");
+    radio(50, 50 + 30, GRAY, LIGHTBLUE, "B", 20, "Group1");
+    radio(50, 80 + 30, GRAY, LIGHTBLUE, "C", 20, "Group1");
+    
+
+    if(checkBox(120, 120, LIGHT_GRAY, BLUE, "ID", 30)){
+      Paint_DrawString_EN(53, 50, (std::to_string(buttonDown) + " buttonDown").c_str(), &Font12, BLACK, GREEN);
+    }
+    slider(50, 150, GRAY, PURPLE, "Idk Some ID", 120, 20);
   }
 
 

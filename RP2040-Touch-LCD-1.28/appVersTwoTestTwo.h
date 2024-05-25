@@ -4,7 +4,7 @@
 extern bool inTransition;extern bool pauseRender;extern bool watchSwipe;extern bool otherSwipe;extern UWORD* BlackImage; //Other
 extern std::list<std::string> appPermissions;extern std::string appTitle;extern std::string appDesc;extern std::string appPub;extern std::string appOthInfo;extern float appVersion;extern int appDatePub;extern std::string appHash; //Config
 extern uint16_t deviceMainColorTheme;extern uint16_t deviceSecondColorTheme;extern uint16_t deviceThirdColorTheme; // Device Customization Settings [Optional]
-bool swipe(std::string dir, int thresh);void openApp(std::string app, std::string dir, int start);std::string internet_get(std::string url);void internet_post(std::string toilet, std::string data);bool button(int x, int y, const char *text, sFONT *Font, UWORD Color_Foreground, UWORD Color_Background, int size);std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible);
+bool swipe(std::string dir, int thresh);void openApp(std::string app, std::string dir, int start);std::string internet_get(std::string url);void internet_post(std::string toilet, std::string data);bool button(int x, int y, const char *text, sFONT *Font, UWORD Color_Foreground, UWORD Color_Background, int size);std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible);bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size);int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height);bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 
 //Extra Libs
 #include <string>
@@ -29,6 +29,7 @@ public:
 
   void launch() override {  // Triggers upon first time opening app
     bool tap = false;       //local var test
+    snackBar("rwar", WHITE, BLACK);
     // ...
   }
 

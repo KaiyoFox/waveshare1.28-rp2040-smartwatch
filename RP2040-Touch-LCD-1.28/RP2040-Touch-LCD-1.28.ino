@@ -74,6 +74,7 @@ int frameCount = 0;
 int fps = 0;
 int lastfpstick = 0;
 bool oneTickPause = false;
+bool miscSwipe = true;
 bool typeOfApp = false;
 int buttonPressCount = 0;
 const char* message = "";
@@ -90,10 +91,11 @@ std::map<std::string, App*> appsV2;
 std::string runningAppName = "boot";
 std::string lastUsedAppName = "main";
 std::list<float> batVoltages = {};
-std::list<std::string> appPermissions = {};
-int autoClock = 15000;  //Auto clock screen
+std::map<std::list<std::string>, int> specialButtons = {};                    //{"APP","ID", "TYPE"}: VALUE
+std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
+int autoClock = 15000;                                                        //Auto clock screen
 std::string error = "";
-std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time"};
+std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
 struct Service {
@@ -112,6 +114,7 @@ void appV2() {
   }
 };
 
+std::list<std::string> appPermissions = {};
 std::string appTitle = "";    // Title
 std::string appDesc = "";     // Description
 std::string appPub = "";      // Publisher
@@ -218,6 +221,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
     if (draggingScrollE) {
       otherSwipe = false;
       watchSwipe = false;
+      miscSwipe = false;
     }
   } else {
     if (draggingScrollE) {
@@ -742,9 +746,247 @@ void checkNotif() {
   }
 }
 
-bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size) {
-  appSize = 45;   //35 Adjust as needed
-  appLeng = 140;  //140
+int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height) {  //needs, nicing (HEIGHT IS SCALE!)
+  if (specialButtons.find({ runningAppName, id, "slider" }) == specialButtons.end()) {
+    specialButtons[{ runningAppName, id, "slider" }] = 0;  //app, id, type   value
+  }
+
+  if (!batSaver) {
+    Paint_DrawRectangle(((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x, y + (height / 2) - (height / 10), x + width, y + (height / 2) + (height / 10), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x, y + (height / 2) - (height / 10), ((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x + (height / 3), y + (height / 2) + (height / 10), InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  }  //Old end X was x+width
+
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x - (height / 2) && Touch_CTS816.x_point <= x + width + (height / 2) && Touch_CTS816.y_point >= y - (height / 2) && Touch_CTS816.y_point <= y + height + (height / 2)) {
+      if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+        otherSwipe = false;
+        watchSwipe = false;
+        miscSwipe = true;
+        inTransition = false;
+        pauseRender = false;
+        scrollV = 0;
+        scrollY = 0;
+        specialButtons[{ runningAppName, id, "slider" }] = 100.0 * (float)((float)((Touch_CTS816.x_point + height) - x) / (float)(x + width));
+        if (!batSaver) {
+          Paint_DrawCircle(((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x + (height / 2), y + (height / 2), (int)((float)height / (float)1.5), DARKGRAY, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+        }
+      }
+    }
+  }
+
+  if (batSaver) {
+    Paint_DrawRectangle(((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x, y, ((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x + height, y + height, InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  } else {
+    Paint_DrawCircle(((float)(specialButtons[{ runningAppName, id, "slider" }] / 100.0) * width) + x + (height / 2), y + (height / 2), (height / 2), InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  }
+  return specialButtons[{ runningAppName, id, "slider" }];
+}
+
+
+bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size = 30) {
+  if (specialButtons.find({ runningAppName, id, "checkBox" }) == specialButtons.end()) {
+    specialButtons[{ runningAppName, id, "checkBox" }] = 0;  //app, id, type   value
+  }
+
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + size && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + size) {
+      if (tap && !watchSwipe && !otherSwipe && !miscSwipe && !inTransition && !pauseRender) {
+        if (tapHeld <= 1) {
+          tap = false;
+          otherSwipe = false;
+          watchSwipe = false;
+          inTransition = false;
+          pauseRender = false;
+          scrollV = 0;
+          scrollY = 0;
+          tapHeld = 999;
+          if (specialButtons[{ runningAppName, id, "checkBox" }] == 1) {
+            specialButtons[{ runningAppName, id, "checkBox" }] = 0;
+          } else {
+            specialButtons[{ runningAppName, id, "checkBox" }] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  if (specialButtons[{ runningAppName, id, "checkBox" }] == 1) {
+    Paint_DrawRectangle(x, y, x + size, y + size, XColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x - 1, y - 1, x + size + 2, y + size + 2, 0x2124, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    if (batSaver) {
+      Paint_DrawLine(x + 5, y + 5, x + size - 5, y + size - 5, WHITE, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+      Paint_DrawLine(x + size - 5, y + 5, x + 5, y + size - 5, WHITE, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+    } else {
+      int margin = 7;
+      int startX = x + margin;
+      int startY = y + size - margin;
+      int midX = x + size / 2;
+      int midY = y + size - size / 2;  //3
+      int endX = x + size - margin;
+      int endY = y + margin;
+      Paint_DrawLine(endX, endY, midX, startY, WHITE, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+      Paint_DrawLine(midX, startY, startX, midY, WHITE, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+    }
+  } else {
+    Paint_DrawRectangle(x, y, x + size, y + size, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x - 1, y - 1, x + size + 2, y + size + 2, 0x2124, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  }
+
+  return specialButtons[{ runningAppName, id, "checkBox" }];
+}
+
+bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group) {
+  if (specialButtons.find({ runningAppName, id, "radio" + group }) == specialButtons.end()) {
+    bool firstOfMyKind = true;
+    for (auto& [key, value] : specialButtons) {
+      std::string appName = key.front();
+      std::string buttonGroup = key.back();
+      auto it = std::next(key.begin(), 1);
+      std::string butId = *it;
+
+      if (appName == runningAppName && buttonGroup == "radio" + group) {
+        firstOfMyKind = false;
+      }
+    }
+    if (firstOfMyKind == true) {
+      specialButtons[{ runningAppName, id, "radio" + group }] = 1;  //app, id, type   value
+    } else {
+      specialButtons[{ runningAppName, id, "radio" + group }] = 0;
+    }
+  }
+
+  if (specialButtons[{ runningAppName, id, "radio" + group }] == 1) {  //Make Circle, in circle, if selected, if not, Only Outline Circle
+    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), XColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 4.5), XColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  } else {
+    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  }
+
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + size && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + size) {
+      if (tap && !watchSwipe && !otherSwipe && !miscSwipe && !inTransition && !pauseRender) {
+        if (tapHeld <= 1) {
+          tap = false;
+          otherSwipe = false;
+          watchSwipe = false;
+          inTransition = false;
+          pauseRender = false;
+          scrollV = 0;
+          scrollY = 0;
+          tapHeld = 999;
+
+          for (auto& [key, value] : specialButtons) {
+            std::string appName = key.front();
+            std::string buttonGroup = key.back();
+            auto it = std::next(key.begin(), 1);
+            std::string butId = *it;
+
+            if (appName == runningAppName && buttonGroup == "radio" + group) {
+              specialButtons[{ appName, butId, "radio" + group }] = 0;
+            }
+          }
+          specialButtons[{ runningAppName, id, "radio" + group }] = 1;
+        }
+      }
+    }
+  }
+
+  return specialButtons[{ runningAppName, id, "radio" + group }];
+}
+
+//{"APP","ID", "TYPE"}: {EXTRA}
+bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size = 30) {
+  //Paint_DrawRectangle(x, y, x + size + size, y + size, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  if (specialButtons.find({ runningAppName, id, "toggle" }) == specialButtons.end()) {
+    specialButtons[{ runningAppName, id, "toggle" }] = 0;  //app, id, type   value
+    specialButtonsExtra[{ runningAppName, id, "toggle" }] = { 0, 0 };
+  }
+
+  if (!batSaver) {
+    specialButtonsExtra[{ runningAppName, id, "toggle" }] = { (float)specialButtonsExtra[{ runningAppName, id, "toggle" }].front() / (float)1.5, specialButtonsExtra[{ runningAppName, id, "toggle" }].back() + specialButtonsExtra[{ runningAppName, id, "toggle" }].front() };
+  }
+
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + size + size && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + size) {
+      if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+        if (tapHeld <= 1) {
+          tap = false;
+          otherSwipe = false;
+          watchSwipe = false;
+          inTransition = false;
+          miscSwipe = true;
+          pauseRender = false;
+          scrollV = 0;
+          scrollY = 0;
+          tapHeld = 999;
+          float ae = size;
+          if (specialButtons[{ runningAppName, id, "toggle" }] == 1) {
+            if (batSaver) {
+              specialButtonsExtra[{ runningAppName, id, "toggle" }] = { 0.0, 0.0 };
+            } else {
+              specialButtonsExtra[{ runningAppName, id, "toggle" }] = { (float)-ae / (float)3.0, ae };
+            }
+            specialButtons[{ runningAppName, id, "toggle" }] = 0;
+          } else {
+            if (batSaver) {
+              specialButtonsExtra[{ runningAppName, id, "toggle" }] = { 0.0, ae };
+            } else {
+              specialButtonsExtra[{ runningAppName, id, "toggle" }] = { (float)ae / (float)3.0, 0 };
+            }
+            specialButtons[{ runningAppName, id, "toggle" }] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  if (batSaver) {
+    if (specialButtons[{ runningAppName, id, "toggle" }]) {
+      Paint_DrawRectangle(x, y, x + size + size, y + size, ToggleColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    } else {
+      Paint_DrawRectangle(x, y, x + size + size, y + size, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    }
+    Paint_DrawRectangle(x + specialButtonsExtra[{ runningAppName, id, "toggle" }].back(), y, x + size + specialButtonsExtra[{ runningAppName, id, "toggle" }].back(), y + size, WHITE, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+    if (specialButtons[{ runningAppName, id, "toggle" }]) {
+      Paint_DrawRectangle(x, y, x + size + size, y + size, ToggleColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    } else {
+      Paint_DrawRectangle(x, y, x + size + size, y + size, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    }
+  } else {
+    if (specialButtons[{ runningAppName, id, "toggle" }]) {
+      Paint_DrawRectangle(x + (size / 2), y, x + size + (size / 2), y + size, ToggleColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+      Paint_DrawCircle(x + size + (size / 2), y + (size / 2), (size / 2), ToggleColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+      Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), ToggleColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    } else {
+      Paint_DrawRectangle(x + (size / 2), y, x + size + (size / 2), y + size, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+      Paint_DrawCircle(x + size + (size / 2), y + (size / 2), (size / 2), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+      Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    }
+
+    Paint_DrawCircle(x + specialButtonsExtra[{ runningAppName, id, "toggle" }].back() + (size / 2), y + (size / 2), (size / 2), WHITE, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    //Paint_DrawRectangle(x + (size / 2), y, x + size + (size / 2), y + size, OutlineColor, DOT_PIXEL_3X3, DRAW_FILL_EMPTY);
+  }
+
+  return specialButtons[{ runningAppName, id, "toggle" }];
+}
+
+//TODO Upon App First time open, Reset all Per App Toggle Values to 0 //DONE
+//Maybe add drop down select things https://mui.com/material-ui/react-select/ ////////////////////////////////////////////////////////////////
+
+//TODO Add Alerts, little popups at bottom of screen that go above system running app, andd, Yeah, display for X time https://mui.com/material-ui/react-snackbar/ //DONE
+
+//////////////////////
+//TODO Add Linear and Circular Progress Bars, and give both Continuous? Options, If continous it just spins/loops forever until not rendering, if Not continuous, it needs a value from 0-100 to show percentage
+//https://mui.com/material-ui/react-progress/
+
+//AFTER FIXING BUTTONS AS TODO SAYS, Add "Toggle Buttons" press the button, stays on, deselect, etc
+bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size) {  //TODO Make size more variable
+  appSize = 45;                                                                                                       //35 Adjust as needed
+  appLeng = 140;                                                                                                      //140
 
   if (size == 0) {
     Paint_DrawRectangle(x + 18, y + 0, x + 123, y + 1, Color_Foreground, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -840,7 +1082,7 @@ bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground,
   Paint_DrawString_EN(x + 5, y + ((appSize / 2) - 8), text, Font, Color_Foreground, Color_Background);  //(x + appLeng) - (std::strlen(key.c_str())*11) - 1,font8 0x009688
   if (inTransition == false && !pauseRender) {
     if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + appLeng && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + appSize) {
-      if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+      if (tap && !watchSwipe && !otherSwipe && !miscSwipe && !inTransition && !pauseRender) {
         if (tapHeld <= 1) {
           tap = false;
           otherSwipe = false;
@@ -856,6 +1098,64 @@ bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground,
     }
   }
   return false;
+}
+
+int snackDisplayed = 0;
+int snackYp = 240;
+float snackYv = 0;
+std::string currentSnack = "";
+UWORD currrntSnackBack;
+UWORD currentSnackText;
+
+void snackBar(std::string text, UWORD BGC, UWORD TXCOLOR) {
+  currentSnack = text;
+  currrntSnackBack = BGC;
+  currentSnackText = TXCOLOR;
+  snackDisplayed = millis();
+  snackYv = -35.0;
+  snackYp = 240;
+}
+
+void renderSnack() {
+  int size = 150;
+  int ysize = 30;
+  if (batSaver) {
+    if (snackYv < -1) {
+      snackYp = 205 - ysize;
+    } else {
+      snackYp = 250;
+    }
+  } else {
+    snackYv = snackYv / 1.6;
+    if(abs(snackYv) < 1){
+      snackYv = 0;
+    }
+    snackYp = snackYp + snackYv;
+  }
+  if (currentSnack != "") {
+    miscSwipe = true;
+    int x = 120 - (size / 2);
+    int y = snackYp;  //205 - ysize;
+
+    if (batSaver) {
+      Paint_DrawRectangle(x, min(y, 240), x + size, min(240, y + ysize), currrntSnackBack, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    } else {
+      Paint_DrawCircle(x + (ysize / 2), y + (ysize / 2), (ysize / 2), currrntSnackBack, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+      Paint_DrawCircle(x + size - (ysize / 2), y + (ysize / 2), (ysize / 2), currrntSnackBack, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + (ysize / 2), min(240, y), x + size - (ysize / 2), min(240, y + ysize), currrntSnackBack, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    }
+    Paint_DrawString_EN(x + 10, min(240, y + ((ysize - 24) / 2)), currentSnack.c_str(), &Font24, currrntSnackBack, currentSnackText);
+  }
+
+  if (millis() - snackDisplayed > 6000) {
+    snackDisplayed = millis() - 6000;
+    snackYv = 40;
+  }
+  if (snackYp > 240) {
+    currentSnack = "";
+    miscSwipe = false;
+    snackYp = 240;
+  }
 }
 
 //Cleaned up some code
@@ -1374,6 +1674,19 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
       appSysConfig();
       if (it == backgroundApps.end()) {
+        for (auto& [key, value] : specialButtons) {
+          std::string appName = key.front();
+          std::string buttonGroup = key.back();
+          auto it = std::next(key.begin(), 1);
+          std::string butId = *it;
+
+          if (appName == app) {
+            specialButtons[{ app, butId, buttonGroup }] = 0;
+            if (buttonGroup == "toggle") {
+              specialButtonsExtra[{ app, butId, "toggle" }] = { 0, 0 };
+            }
+          }
+        }
         appLaunch();
       }
     }
@@ -1505,12 +1818,12 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
 std::string swipeComplete = "";
 bool watchSwipe = false;
-int swipeStartThresh = 50;
+int swipeStartThresh = 10;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
 bool swipe(std::string dir, int thresh) {
   bool swipeDone = false;
-  if (inTransition == false) {
+  if (inTransition == false && miscSwipe == false) {
     if (tap == false && otherSwipe == true && swipeComplete == "") {
       activeDir = "";
     }
@@ -2265,11 +2578,11 @@ bool alreadySet = true;
 void loop() {
   //Touch_INT_callback();
   ///> 3000 ,,,,,,, > 10
-  if (millis() - shouldConsiderUpdating > 5000 || (millis() - shouldConsiderUpdating > 50 && (scrolling || tap || otherSwipe || watchSwipe || inTransition))) {
+  if (millis() - shouldConsiderUpdating > 5000 || (millis() - shouldConsiderUpdating > 50 && (scrolling || tap || otherSwipe || watchSwipe || inTransition || miscSwipe))) {
     shouldConsiderUpdating = millis();
     if (batSaver == false) {
       if (speedMode == false) {
-        if ((tap && tapHeld > 3) || scrolling || otherSwipe || watchSwipe || inTransition) {
+        if ((tap && tapHeld > 3) || scrolling || otherSwipe || watchSwipe || inTransition || miscSwipe) {
           if (turboClock == false) {
             turboClock = true;
             medClock = false;
@@ -2330,6 +2643,7 @@ void loop() {
     //otherSwipe=false;//WAS TURNED OFF, for some reason
     watchSwipe = false;
     otherSwipe = false;
+    miscSwipe = false;
     ticksSinceTap = 0;
     activeDir = "";
     //Serial.println("Releasse");
@@ -2451,8 +2765,8 @@ void loop() {
       //tap=true;
       idleTime = millis();
       if (runningAppName != "home") {
-        if (watchSwipe == true && otherSwipe == false) {  // && pauseRender==false
-                                                          //pauseRender=true;
+        if (watchSwipe == true && otherSwipe == false && miscSwipe == false) {  // && pauseRender==false
+                                                                                //pauseRender=true;
 
           //if(tapHeld > 2){
           Paint_DrawRectangle(45, 225, 195, 235, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -2468,7 +2782,7 @@ void loop() {
           //tap = false;
           //}
           if (Touch_CTS816.y_point < 70) {  //was 190
-            inTransition = false;
+            //inTransition = false;
             //tap=true;
             //inTransition=true;//runningApp();
             //pauseRender = true;//Paint_DrawRectangle(40, Touch_CTS816.y_point, 200, min(Touch_CTS816.y_point+6,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -2594,6 +2908,10 @@ void loop() {
     ticksSinceTap++;
   }
 */
+  renderSnack();
+
+
+
   frameCount++;
   if (millis() - lastfpstick >= 2000) {
     lastfpstick = millis();

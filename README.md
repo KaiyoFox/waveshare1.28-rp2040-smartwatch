@@ -29,7 +29,7 @@ The Seeed Xiao BLE nRF52840 is used for its Bluetooth capabilities. You can find
 
 ## Wiring Diagram
 
-| RP2040 Pin | Seeed Pin |
+| RP2040 Pin | Seeed Pin / Other |
 |------------|-----------|
 | GND        | GND       |
 | VSYS       | 3V3       |
@@ -41,10 +41,10 @@ The Seeed Xiao BLE nRF52840 is used for its Bluetooth capabilities. You can find
 | GPIO 17    | D4        |
 | GPIO 18    | D3        |
 | GPIO 26    | Connect to 100k resistor that is on GND2 |
-| GPIO 27    | Nothing   |
-| GPIO 28    | Nothing   |
+| GPIO 27    | Unused   |
+| GPIO 28    | Haptic Motor +   |
 
-Note: On the Seeed Xiao, D2 is unused and D6 - D10 are also unused.
+Note: On the button put a capacitor on both ends, Negative on GND2
 
 ## Flashing the Seeed Xiao
 
