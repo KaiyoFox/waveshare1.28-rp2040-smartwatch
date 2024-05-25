@@ -40,60 +40,59 @@
 #define __FONTS_H
 
 /*最大字体微软雅黑24 (32x41)*/
-#define MAX_HEIGHT_FONT         41
-#define MAX_WIDTH_FONT          32
-#define OFFSET_BITMAP           
+#define MAX_HEIGHT_FONT 41
+#define MAX_WIDTH_FONT 32
+#define OFFSET_BITMAP
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
 
-//ASCII
-typedef struct _tFont
-{    
-  const uint8_t *table;
-  uint16_t Width;
-  uint16_t Height;
-  
-} sFONT;
+  //ASCII
+  typedef struct _tFont {
+    const uint8_t *table;
+    uint16_t Width;
+    uint16_t Height;
+
+  } sFONT;
 
 
-//GB2312
-typedef struct                                        // 汉字字模数据结构
-{
-  const  char index[4];                               // 汉字内码索引
-  const  char matrix[MAX_HEIGHT_FONT*MAX_WIDTH_FONT/8];  // 点阵码数据
-}CH_CN;
+  //GB2312
+  typedef struct  // 汉字字模数据结构
+  {
+    const char index[4];                                      // 汉字内码索引
+    const char matrix[MAX_HEIGHT_FONT * MAX_WIDTH_FONT / 8];  // 点阵码数据
+  } CH_CN;
 
 
-typedef struct
-{    
-  const CH_CN *table;
-  uint16_t size;
-  uint16_t ASCII_Width;
-  uint16_t Width;
-  uint16_t Height;
-  
-}cFONT;
+  typedef struct
+  {
+    const CH_CN *table;
+    uint16_t size;
+    uint16_t ASCII_Width;
+    uint16_t Width;
+    uint16_t Height;
 
-extern sFONT Font24;
-extern sFONT Font20;
-extern sFONT Font16;
-extern sFONT Font12;
-extern sFONT Font8;
-extern sFONT BetterFont12;
+  } cFONT;
+
+  extern sFONT Font24;
+  extern sFONT Font20;
+  extern sFONT Font16;
+  extern sFONT Font12;
+  extern sFONT Font8;
+  extern sFONT BetterFont12;
 
 
-extern cFONT Font12CN;
-extern cFONT Font24CN;
+  extern cFONT Font12CN;
+  extern cFONT Font24CN;
 #ifdef __cplusplus
 }
 #endif
-  
+
 #endif /* __FONTS_H */
- 
+
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
