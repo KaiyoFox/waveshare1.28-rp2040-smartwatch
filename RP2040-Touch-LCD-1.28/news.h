@@ -71,7 +71,7 @@ void news() {
 
 
 
-
+  renderSnack();
   if (inTransition == false) {
     if (lastUsedAppName == "main") {
       if (swipe("right", 70)) {

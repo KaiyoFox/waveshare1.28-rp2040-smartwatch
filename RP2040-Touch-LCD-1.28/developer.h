@@ -2782,6 +2782,7 @@ void developer() {
   }
 
 
+  renderSnack();
   if (inTransition == false) {
     // Handle swipe event
     if (swipe("left", 70)) {

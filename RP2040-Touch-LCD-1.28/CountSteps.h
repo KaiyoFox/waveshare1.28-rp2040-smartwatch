@@ -345,6 +345,7 @@ void CountSteps() {
   //Paint_DrawString_EN(10, 120, internet_get("watch").c_str(), &Font16, RED, WHITE);
   //Serial.println(internet_get("watch").c_str());
 
+  renderSnack();
   if (inTransition == false) {
     if (pauseRender == false) {
       //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);

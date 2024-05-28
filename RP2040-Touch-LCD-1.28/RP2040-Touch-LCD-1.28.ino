@@ -13,6 +13,20 @@
 #include <iostream>
 #include <chrono>
 
+void renderSnack();
+void systemTime();  //Might remove, and just make users do snackRender or wahtever, and make it optional
+bool swipe(std::string dir, int thresh);
+void openApp(std::string app, std::string dir, int start);
+std::string internet_get(std::string url);
+void internet_post(std::string toilet, std::string data);
+bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size);
+std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible);
+bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size);
+int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height);
+bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);
+bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);
+void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
+
 //Builtin-Apps/Processes:
 //include "home.h"
 #include "mainScreen.h"
@@ -95,6 +109,11 @@ std::map<std::list<std::string>, int> specialButtons = {};                    //
 std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
 int autoClock = 15000;                                                        //Auto clock screen
 std::string error = "";
+std::string swipeComplete = "";
+bool watchSwipe = false;
+int swipeStartThresh = 10;  //was like. 50
+//bool swipeDone = false;
+std::string activeDir = "";
 std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
@@ -105,6 +124,7 @@ struct Service {
 std::list<Service> services;
 void appV2() {
   typeOfApp = true;
+  /*
   auto itNew = appsV2.find(runningAppName);
   if (itNew != appsV2.end()) {
     runningAppV2 = [instance = itNew->second]() {
@@ -112,6 +132,7 @@ void appV2() {
     };
     runningAppV2();
   }
+  */
 };
 
 std::list<std::string> appPermissions = {};
@@ -130,6 +151,9 @@ void runningApp() {
     runningAppV2();
   } else {
     runningAppV1();
+  }
+  if (systemDisplayUpdates) {
+    systemTime();
   }
   if (systemDisplayUpdates && pauseRender == false && inTransition == false) {
     LCD_1IN28_Display(BlackImage);
@@ -1127,13 +1151,13 @@ void renderSnack() {
     }
   } else {
     snackYv = snackYv / 1.6;
-    if(abs(snackYv) < 1){
+    if (abs(snackYv) < 1) {
       snackYv = 0;
     }
     snackYp = snackYp + snackYv;
   }
   if (currentSnack != "") {
-    miscSwipe = true;
+    //miscSwipe = true;
     int x = 120 - (size / 2);
     int y = snackYp;  //205 - ysize;
 
@@ -1153,9 +1177,13 @@ void renderSnack() {
   }
   if (snackYp > 240) {
     currentSnack = "";
-    miscSwipe = false;
+    //miscSwipe = false;
     snackYp = 240;
   }
+}
+
+void systemTime() {
+  renderSnack();
 }
 
 //Cleaned up some code
@@ -1246,9 +1274,10 @@ void transitionLROLD(std::string app, int begin = 0) {
   //func();
 }
 
+
+std::function<void()> funcA;
 void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
   AppPtr func = apps[app];
-  std::function<void()> funcA;
   inTransition = true;
   int transP = begin;
   //I commented out the lower lines a while back for some odd reason
@@ -1256,7 +1285,7 @@ void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
   if (typeOfApp == true) {
     auto itNew = appsV2.find(app);
     if (itNew != appsV2.end()) {
-      std::function<void()> funcA = [instance = itNew->second]() {
+      funcA = [instance = itNew->second]() {
         instance->update();
       };
       //funcA();
@@ -1305,7 +1334,6 @@ void transitionLEER(std::string app, int begin = 0, bool typeOfApp = false) {
 
 void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
   AppPtr func = apps[app];
-  std::function<void()> funcA;
   inTransition = true;
   int transP = begin;
   //I commented out the lower lines a while back for some odd reason
@@ -1313,7 +1341,7 @@ void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
   if (typeOfApp == true) {
     auto itNew = appsV2.find(app);
     if (itNew != appsV2.end()) {
-      std::function<void()> funcA = [instance = itNew->second]() {
+      funcA = [instance = itNew->second]() {
         instance->update();
       };
       //funcA();
@@ -1386,7 +1414,6 @@ void transitionUDSDFDFD(std::string app, int begin = 0) {
 
 void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
   AppPtr func = apps[app];
-  std::function<void()> funcA;
   inTransition = true;
   int transP = begin;
   //I commented out the lower lines a while back for some odd reason
@@ -1394,7 +1421,7 @@ void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
   if (typeOfApp == true) {
     auto itNew = appsV2.find(app);
     if (itNew != appsV2.end()) {
-      std::function<void()> funcA = [instance = itNew->second]() {
+      funcA = [instance = itNew->second]() {
         instance->update();
       };
       //funcA();
@@ -1457,7 +1484,7 @@ void transitionDU(std::string app, int begin = 240, bool typeOfApp = false) {
   if (typeOfApp == true) {
     auto itNew = appsV2.find(app);
     if (itNew != appsV2.end()) {
-      std::function<void()> funcA = [instance = itNew->second]() {
+      funcA = [instance = itNew->second]() {
         instance->update();
       };
       //funcA();
@@ -1576,26 +1603,36 @@ void transitionDOWNRAND(std::string app, bool typeOfApp = false) {  //good?
   //func();
 }
 
+AppPtr funcER;
 void openApp(std::string app, std::string dir = "", int start = -1) {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
   delay(5);
   set_sys_clock_khz(400000, true);
+
+  otherSwipe = false;
+  watchSwipe = false;
+  miscSwipe = false;
+  swipeComplete = "";
+  watchSwipe = false;
+  activeDir = "";
+
   speedMode = false;
   idleTime = millis();
+
   if (app == "home") {
     DEV_SET_PWM(50);
   } else {
     if (runningAppName == "home") {
       DEV_SET_PWM(50);
     }
-  }
-  //DEV_Delay_ms(1);
+  }  //DEV_Delay_ms(1);
   inTransition = true;
   pauseRender = true;
   resetTransitionAfterTick = true;
-  AppPtr func = apps[app];
+  funcER = apps[app];
   std::function<void()> appLaunch;     // for v2 apps
   std::function<void()> appSysConfig;  // for v2 apps
+
   //auto itOld = apps.find(app);
   //if (itOld != apps.end()) {
   //  // Call the function pointer
@@ -1645,7 +1682,9 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   appPermissions = {};
   systemDisplayUpdates = false;  //default for v1 apps
 
-  func();
+  funcER = apps[app];
+  funcER();
+
   if (typeOfApp == false) {    //v1
     appPermissions = { "*" };  //Unsafe
     appTitle = app;
@@ -1655,8 +1694,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     appVersion = 1.0;
     appDatePub = 0;
     appHash = "bc7819b34ff87570745fbe461e36a16f80e562ce";
-  } else if (systemDisplayUpdates == false) {  //v2
-    systemDisplayUpdates = true;               //Default for v2 apps
+  } else {                        //v2
+    systemDisplayUpdates = true;  //Default for v2 apps
   }
   if (typeOfApp == true) {
     auto itNew = appsV2.find(app);
@@ -1668,9 +1707,9 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       appLaunch = [instance = itNew->second]() {
         instance->launch();
       };
-      std::function<void()> func = [instance = itNew->second]() {
-        instance->update();
-      };
+      //std::function<void()> func = [instance = itNew->second]() {
+      //  instance->update();
+      //};
 
       appSysConfig();
       if (it == backgroundApps.end()) {
@@ -1691,7 +1730,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       }
     }
     //Serial.println("V2 App");
-  } else if (app != "error" && app != "main" && app != "home" && app != "appsPanel" && app != "Developer" && app != "recentApps") {  //example get angy for outdated apps
+  } else if (app != "keyboard" && app != "error" && app != "main" && app != "home" && app != "appsPanel" && app != "Developer" && app != "recentApps") {  //example get angy for outdated apps
     error = "Warning! App is out-dated and cannot be identified.";
     //app = "error";
   }
@@ -1702,9 +1741,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       start = 0;
     }
   }
-
   //Significantly slows down stuff (All transition stuff)
-  func();
+  funcER();
   if (dir == "LR") {
     transitionLR(app, start, typeOfApp);
   } else if (dir == "RL") {
@@ -1716,7 +1754,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   } else if (dir == "RAND") {
     transitionRAND(app, typeOfApp);  //transitionDOWNRAND(app);
   }
-  func();  ///////Temp for testing? maybe may stay just needs to run smoother
+  //func();                                                ///////Temp for testing? maybe may stay just needs to run smoother
   //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
   //DEV_Delay_ms(1);
   lastUsedAppName = runningAppName;
@@ -1730,6 +1768,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     };
     //}
   }
+
   //itOld = apps.find(app);
   //if (itOld != apps.end()) {
   //  // Call the function pointer
@@ -1755,8 +1794,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   last2 = 0;
   inTransition = true;
   /////Not needed?? Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  runningApp();  ///////Temp for testing? maybe may stay just needs to run smoother
-  //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
+  runningApp();                                          ///////Temp for testing? maybe may stay just needs to run smoother
+  LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
+  runningApp();                                          ///////Temp for testing? maybe may stay just needs to run smoother
+  LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
   //runningApp();  //extra
 
   //DEV_Delay_ms(1);
@@ -1816,11 +1857,6 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   }
 }
 
-std::string swipeComplete = "";
-bool watchSwipe = false;
-int swipeStartThresh = 10;  //was like. 50
-//bool swipeDone = false;
-std::string activeDir = "";
 bool swipe(std::string dir, int thresh) {
   bool swipeDone = false;
   if (inTransition == false && miscSwipe == false) {
@@ -2387,7 +2423,7 @@ void setup() {
   CurTime = readFromEEPROM(address);
   DEV_Delay_ms(10);
 
-
+  //Apps V1
   apps["home"] = &home;
   apps["main"] = &mainScreen;
   apps["notifPane"] = &notifPane;
@@ -2396,7 +2432,7 @@ void setup() {
   //apps["nfc"] = &nfc;
   apps["Set Time"] = &setTime;
   apps["previewNotif"] = &previewNotif;
-  apps["keyboard"] = &keyboard;
+  apps["keyboard"] = &keyboardR;
   apps["Settings"] = &settings;
   apps["error"] = &errorHandle;
 
@@ -2411,17 +2447,8 @@ void setup() {
   apps["News"] = &news;
   apps["FindMyPhone"] = &findMyPhone;
   apps["Alarms"] = &alarms;
-  //apps["scrollingTest"] = &scrollingTest;
 
-  //appVersTwo &update;
-  // appVersTwo App;
-  //App.update();
-
-  //appVersTwo* appVersTwoPtr = appVersTwo;
-  //void (*myShortcutFunction)() = appVersTwoPtr->update;
-  //appVersTwo myApp;  // Create an instance of appVersTwo
-  //  void myShortcutFunction(){ appVersTwo.update(); };
-
+  //Apps V2
   apps["appVersTwo"] = &appV2;
   appsV2["appVersTwo"] = new appVersTwo();
 
@@ -2908,7 +2935,7 @@ void loop() {
     ticksSinceTap++;
   }
 */
-  renderSnack();
+  //renderSnack();
 
 
 

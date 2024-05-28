@@ -60,6 +60,7 @@ void setTime() {
   }
   //Paint_DrawRectangle(0, 50, 240, 190, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
+  renderSnack();
   if (inTransition == false) {
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);

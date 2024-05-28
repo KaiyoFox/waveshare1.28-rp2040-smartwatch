@@ -163,6 +163,7 @@ void appsPanel() {
 
   //scrollFunction(visibleCount, {}, true);
 
+  renderSnack();
   if (inTransition == false) {
     if (pauseRender == false && openingAnApp == false) {
       //LCD_1IN28_DisplayWindows(startX - 2, 0, 180, 240, BlackImage);

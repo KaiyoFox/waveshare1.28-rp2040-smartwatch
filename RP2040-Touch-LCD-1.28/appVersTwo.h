@@ -32,10 +32,6 @@ extern uint16_t deviceSecondColorTheme;
 extern uint16_t deviceThirdColorTheme;
 extern UWORD* BlackImage;
 
-bool swipe(std::string dir, int thresh);
-// ... (Implement Buttons, TextBoxes, ScrollWheel, Checkboxes, Etc)
-void openApp(std::string app, std::string dir, int start);
-
 class appVersTwo : public App {
 public:
   void sysConfig() override {                    // Triggers randomly when device needs info
@@ -60,6 +56,7 @@ public:
   void update() override {  // Triggers on each frame
     Paint_DrawRectangle(0, 0, 100, 100, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
+    renderSnack(); //If using snackBar
     if (inTransition == false && pauseRender == false) {  // Only needed if systemUpdates is True
       LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     }

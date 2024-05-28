@@ -61,7 +61,7 @@ void recentApps() {
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
 
   for (auto it = backgroundApps.rbegin(); it != backgroundApps.rend(); ++it) {
-    const std::string& key = *it;
+    std::string key = *it;
     if (std::find(systemApps.begin(), systemApps.end(), key) == systemApps.end()) {
       int x = startX;
       int y = 20 + startY + (visibleCount + startIndex) * (appSize + spacing) - scrollYModded;
@@ -118,17 +118,19 @@ void recentApps() {
           if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + appLeng && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + appSize) {
             if (tap && !watchSwipe && !otherSwipe) {
               if (tapHeld <= 1) {
+                //Serial.println(key.c_str());
                 tap = false;
+                recentAppTappedOn = true;
+                openingAnApp = true;
+                oneTickPause = true;
                 tapHeld = 999;
                 if (!key.empty()) {
                   backgroundApps.remove(key);     // Remove the app from its current position
                   backgroundApps.push_back(key);  // Move it to the bottom
                 }
+                Serial.println(key.c_str());
                 openApp(key, "", 0);
-                tap = false;
-                recentAppTappedOn = true;
-                openingAnApp = true;
-                oneTickPause = true;
+                Serial.println("c");
               }
             }
           }
@@ -153,6 +155,7 @@ void recentApps() {
     }
   }
 
+  renderSnack();
   if (inTransition == false) {
     if (swipe("down", 70)) {
       openApp(lastUsedAppName, "UD", Touch_CTS816.y_point);

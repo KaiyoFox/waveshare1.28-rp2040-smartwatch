@@ -10,9 +10,10 @@ extern UWORD* BlackImage;
 extern std::list<std::string> backgroundApps;
 extern std::string keyboardData; //Occurs when Enter Pressed
 extern std::string keyboardTyped; //Just in case apps what access to curretnly typed
+extern std::string lastUsedAppName;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
-void sendText(const char* text);
+//void sendText(const char* text);
 #endif
 
 bool tapDown = false;
@@ -26,7 +27,7 @@ bool tapDown = false;
 
 void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int startX, int startY) {
 
-
+/*
   for (const auto& notification : notifications) {
     auto title = notification.front();
     if (uniqueTitles.find(title) == uniqueTitles.end()) {
@@ -34,14 +35,15 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
       uniqueNotifications.push_back(notification);
     }
   }
+*/
 
   //FIX TAPPED NOTIF IN FUTUREEEE
 
 
-  std::list<std::string> notification = *std::next(uniqueNotifications.begin(), tappedNotif);
-  std::string firstItem = notification.front();
-  std::string lastItem = notification.back();
-  Paint_DrawString_EN(60, 15, lastItem.c_str(), &Font16, BLACK, WHITE);
+  //std::list<std::string> notification = *std::next(uniqueNotifications.begin(), tappedNotif);
+  //std::string firstItem = notification.front();
+  //std::string lastItem = notification.back();
+  //Paint_DrawString_EN(60, 15, lastItem.c_str(), &Font16, BLACK, WHITE);
   Paint_DrawString_EN(50, 35, keyboardTyped.c_str(), &Font16, BLUE, WHITE);
   for (int i = 0; i < rowSize; ++i) {
     if (row[i] != "") {
@@ -84,7 +86,7 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
           } else if (row[i] == ">>") {
             keyboardData = keyboardTyped;
             keyboardTyped = "";
-            openApp(lastUsedAppName,"UD",Touch_CTS816.y_point);
+            openApp(lastUsedAppName,"UD",0);
             /*
             std::string messag = firstItem;  //"8015744494;";
             messag += ";";
@@ -118,7 +120,7 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
 }
 
 
-void keyboard() {
+void keyboardR() {
   if (startup) {
     startup = false;
     keyboardTyped = "";
@@ -166,6 +168,7 @@ void keyboard() {
   //renderRow(row3, keyWidth, keyHeight, 0, 10+(rowOffset * 3));
   //renderRow(row4, keyWidth, keyHeight, 0, 10+(rowOffset * 4));
 
+  //systemTime();
   if (inTransition == false) {
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
     if (swipe("down", 70)) {

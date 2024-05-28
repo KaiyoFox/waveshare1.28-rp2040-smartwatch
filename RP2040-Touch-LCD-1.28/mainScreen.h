@@ -256,6 +256,7 @@ void mainScreen() {
 
   //Stuffs
 
+  renderSnack();
   if (inTransition == false) {
     //Bruh I thought I moved this already.-- Swipe MUST be above renders. Why, Because thats how I designed it to run
     //BRUHH this didn't fix it.

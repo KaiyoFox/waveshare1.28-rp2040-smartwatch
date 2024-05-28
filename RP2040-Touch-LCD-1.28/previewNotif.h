@@ -45,6 +45,7 @@ void previewNotif() {
 
   //Paint_DrawString_EN(100, 100, "nO", &Font24, BLACK, WHITE);
 
+  renderSnack();
   if (inTransition == false) {
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
     if (swipe("right", 70)) {

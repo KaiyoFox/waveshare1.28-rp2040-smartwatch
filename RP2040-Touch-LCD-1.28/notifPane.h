@@ -135,6 +135,7 @@ void notifPane() {
     Paint_DrawRectangle(83, 190, 156, 222, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     Paint_DrawString_EN(90, 199, "Clear", &Font16, GRAY, RED);  //63 char in length
 
+    renderSnack();
     if (inTransition == false) {
       //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
       if (swipe("up", 190)) {
