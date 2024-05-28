@@ -121,6 +121,7 @@ void alarms() {
     Paint_DrawString_EN(20, 150, ("SetTo Time: " + std::to_string(SELalarmHour) + ":" + modifyString(std::to_string(SELalarmMinute))).c_str(), &Font16, BLACK, GREEN);
   }
 
+  renderSnack();
   if (inTransition == false) {
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);

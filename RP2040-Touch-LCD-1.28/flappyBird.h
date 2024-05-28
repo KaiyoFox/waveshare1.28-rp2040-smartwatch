@@ -63,6 +63,7 @@ void flappyBird() {
   Paint_DrawRectangle(obstacleX, gapPosition + gapSize, obstacleX + obstacleWidth, 240, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawString_EN(140, 84, (std::to_string(score)).c_str(), &Font16, BLUE, RED);
 
+  //renderSnack();
   if (inTransition == false) {
     if (pauseRender == false) {
       //LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);

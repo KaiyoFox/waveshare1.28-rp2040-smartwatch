@@ -195,75 +195,76 @@ void messages() {
     }
   }
 
-  Paint_DrawRectangle(101, 195, 139, 196, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(100, 196, 140, 197, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(99, 197, 141, 198, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 198, 103, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(137, 198, 142, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 199, 102, 200, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 199, 142, 200, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 200, 102, 201, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 200, 142, 201, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 201, 102, 202, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 201, 142, 202, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 202, 102, 203, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 202, 142, 203, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 203, 102, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 203, 110, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(114, 203, 118, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(122, 203, 126, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(130, 203, 134, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 203, 142, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 204, 102, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 204, 110, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(114, 204, 118, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(122, 204, 126, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(130, 204, 134, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 204, 142, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 205, 102, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 205, 109, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(114, 205, 117, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(123, 205, 126, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(131, 205, 134, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 205, 142, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 206, 102, 207, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 206, 142, 207, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 207, 102, 208, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 207, 142, 208, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 208, 102, 209, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 208, 142, 209, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 209, 102, 210, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 209, 142, 210, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 210, 102, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(116, 210, 124, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 210, 142, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 211, 102, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 211, 110, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(114, 211, 126, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(130, 211, 134, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 211, 142, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 212, 102, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 212, 110, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(114, 212, 126, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(130, 212, 134, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 212, 142, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 213, 102, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(106, 213, 109, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(115, 213, 125, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 213, 142, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 214, 102, 215, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 214, 142, 215, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 215, 102, 216, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 215, 142, 216, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 216, 102, 217, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 216, 142, 217, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 217, 102, 218, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(138, 217, 142, 218, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(98, 218, 142, 219, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(99, 219, 141, 220, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(100, 220, 140, 221, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(103, 198, 137, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
+  if (tappedNotif != -1) {
+    Paint_DrawRectangle(101, 195, 139, 196, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(100, 196, 140, 197, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(99, 197, 141, 198, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 198, 103, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(137, 198, 142, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 199, 102, 200, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 199, 142, 200, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 200, 102, 201, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 200, 142, 201, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 201, 102, 202, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 201, 142, 202, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 202, 102, 203, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 202, 142, 203, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 203, 102, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 203, 110, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(114, 203, 118, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(122, 203, 126, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(130, 203, 134, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 203, 142, 204, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 204, 102, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 204, 110, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(114, 204, 118, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(122, 204, 126, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(130, 204, 134, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 204, 142, 205, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 205, 102, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 205, 109, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(114, 205, 117, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(123, 205, 126, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(131, 205, 134, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 205, 142, 206, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 206, 102, 207, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 206, 142, 207, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 207, 102, 208, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 207, 142, 208, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 208, 102, 209, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 208, 142, 209, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 209, 102, 210, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 209, 142, 210, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 210, 102, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(116, 210, 124, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 210, 142, 211, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 211, 102, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 211, 110, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(114, 211, 126, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(130, 211, 134, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 211, 142, 212, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 212, 102, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 212, 110, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(114, 212, 126, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(130, 212, 134, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 212, 142, 213, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 213, 102, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(106, 213, 109, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(115, 213, 125, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 213, 142, 214, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 214, 102, 215, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 214, 142, 215, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 215, 102, 216, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 215, 142, 216, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 216, 102, 217, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 216, 142, 217, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 217, 102, 218, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(138, 217, 142, 218, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(98, 218, 142, 219, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(99, 219, 141, 220, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(100, 220, 140, 221, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(103, 198, 137, 199, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  }
 
 
   //No matter where, when you begin tapping somewhere, Everything else blanks out,
@@ -271,6 +272,7 @@ void messages() {
   //But Only messages app???????????
   //Also it kinda looked like no matter who I selected, the title at the top was always mother
 
+  renderSnack();
   if (inTransition == false) {
     // Recommended to Open any asked apps After rendering existing scene to prevent double render black bar
     if (tappedNotif != -1) {

@@ -229,6 +229,7 @@ void addRandomNumber(std::vector<std::vector<int>> &board) {
 void game() {
   renderBoard();
 
+  systemTime();
   if (inTransition == false) {
 
     if (swipe("right", 70)) {

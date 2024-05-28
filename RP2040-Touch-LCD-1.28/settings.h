@@ -358,7 +358,7 @@ void settings() {
   }
 
 
-
+  renderSnack();
   if (inTransition == false) {
     if (page != "") {
       if (swipe("right", 70)) {

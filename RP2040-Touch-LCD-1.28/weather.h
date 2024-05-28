@@ -279,6 +279,7 @@ void weather() {
   }
   Paint_DrawString_EN(120 - ((weatherDesc.length() * 11) / 2), 160, weatherDesc.c_str(), &Font16, BLACK, GRAY);
 
+  renderSnack();
   if (inTransition == false) {
     if (lastUsedAppName == "main") {
       if (swipe("left", 70)) {

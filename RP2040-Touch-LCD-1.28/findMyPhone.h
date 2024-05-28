@@ -41,6 +41,7 @@ void findMyPhone() {
 
   Paint_DrawEdgeEffect();
 
+  renderSnack();
   if (inTransition == false) {
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);

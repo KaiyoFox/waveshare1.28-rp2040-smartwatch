@@ -316,6 +316,7 @@ void flashlight() {
 
   Paint_DrawEdgeEffect();
 
+  renderSnack();
   if (inTransition == false) {
 
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
