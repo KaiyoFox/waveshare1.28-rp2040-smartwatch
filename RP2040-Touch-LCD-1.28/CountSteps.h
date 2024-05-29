@@ -6,6 +6,7 @@ extern bool startup;
 extern bool speedMode;
 extern bool tap;
 extern int CurTime;
+extern int BPM;
 extern int stepCount;
 extern UWORD *BlackImage;
 extern std::list<std::string> backgroundApps;
@@ -43,7 +44,7 @@ float variable_values[MAX_VARIABLE_VALUES];
 int variable_index = 0;
 
 //float highestNumber;
-void detectHeartRate() {
+void detectHeartRateOld() {
   // Calculate acceleration magnitude
   float accelerationMagnitude = sqrt(pow(acc[0], 2) + pow(acc[1], 2) + pow(acc[2], 2) - 1);
 
@@ -62,6 +63,10 @@ void detectHeartRate() {
   } else {
     isHeartBeatDetected = false;
   }
+}
+
+void detectHeartRate(){
+  heartRate = BPM;
 }
 
 
@@ -112,6 +117,8 @@ void CountSteps() {
   }
 
   detectSteps();
+
+  /*
   //Serial.print("Variable_1:");
   //Serial.println((round(gyro[2]/1)*1));
   if ((round(gyro[2] / 1) * 1) < 0 || (round(gyro[2] / 1) * 1) > 4) {
@@ -130,8 +137,9 @@ void CountSteps() {
     startTime = millis();  // Reset the start time
   }
   int heartRate = beatsIn15Sec * 4;
+  */ //^^ REAL OLD
 
-  //detectHeartRate();
+  detectHeartRate();
 
   Paint_DrawRectangle(156, 26, 162, 27, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(153, 27, 165, 28, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);

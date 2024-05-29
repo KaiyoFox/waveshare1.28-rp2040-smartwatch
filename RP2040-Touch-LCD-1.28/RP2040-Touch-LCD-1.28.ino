@@ -12,6 +12,7 @@
 #include <tuple>
 #include <iostream>
 #include <chrono>
+#include <PulseSensorPlayground.h> 
 
 void renderSnack();
 void systemTime();  //Might remove, and just make users do snackRender or wahtever, and make it optional
@@ -59,6 +60,9 @@ void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 #include "appVersTwoTestTwo.h"
 
 
+const int PulseWire = 27;       // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
+int Threshold = 510;//550           // Determine which Signal to "count as a beat" and which to ignore.
+PulseSensorPlayground pulseSensor;  // Creates an instance of the PulseSensorPlayground object called "pulseSensor"
 int address = 1;
 int CurTime;
 int last = 0;
@@ -220,9 +224,10 @@ int initialTap = 0;
 int uiY = 0;
 int currentSnapped = 0;
 float snapVel = 0;
+int BPM = 0;
+int checkBPM = 0;
 
 int lastSpeedCheckTime = 0;
-;
 int lastScrollY = 0;
 
 bool wasAbleToCheck = false;
@@ -2469,8 +2474,11 @@ void setup() {
   pinMode(sendPin, OUTPUT);
   pinMode(receivePin, INPUT);
 
-  pinMode(27, OUTPUT);
+  //pinMode(27, OUTPUT);
   pinMode(28, OUTPUT);
+
+  pulseSensor.analogInput(PulseWire);   //27
+  pulseSensor.setThreshold(Threshold);
   //pins 27, and 28 are Data Out, and Clock
 
   int errorCode = readFromEEPROM(2);
@@ -2879,6 +2887,14 @@ void loop() {
     }
   }
 
+  if(millis()-checkBPM>10000){
+    checkBPM = millis();
+    BPM = pulseSensor.getBeatsPerMinute();
+    if(BPM > 200){
+      BPM = 200;
+    }
+  }
+
   if (runningAppName == "home") {
     if (dontRunDimAgain == false) {
       //DEV_Delay_ms(1000);  //500 ///////////1000 05/19/24
@@ -2918,7 +2934,7 @@ void loop() {
         runningApp();
       }
     }
-  } else if (runningAppName == "CountSteps") {
+  } else if (runningAppName == "Step Tracker") {
     autoClock = 3600000;
   } else {
     autoClock = 15000;
