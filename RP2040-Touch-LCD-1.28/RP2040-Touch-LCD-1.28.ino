@@ -12,7 +12,7 @@
 #include <tuple>
 #include <iostream>
 #include <chrono>
-#include <PulseSensorPlayground.h> 
+#include <PulseSensorPlayground.h>
 
 void renderSnack();
 void systemTime();  //Might remove, and just make users do snackRender or wahtever, and make it optional
@@ -60,8 +60,8 @@ void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 #include "appVersTwoTestTwo.h"
 
 
-const int PulseWire = 27;       // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
-int Threshold = 510;//550           // Determine which Signal to "count as a beat" and which to ignore.
+const int PulseWire = 27;           // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
+int Threshold = 550;//3000;               //510;                //550           // Determine which Signal to "count as a beat" and which to ignore.
 PulseSensorPlayground pulseSensor;  // Creates an instance of the PulseSensorPlayground object called "pulseSensor"
 int address = 1;
 int CurTime;
@@ -226,6 +226,11 @@ int currentSnapped = 0;
 float snapVel = 0;
 int BPM = 0;
 int checkBPM = 0;
+int lastVal = 0;
+int lastValCheck = 0;
+int lastBeat = 0;
+int beat = 0;
+bool BeatTrig = false;
 
 int lastSpeedCheckTime = 0;
 int lastScrollY = 0;
@@ -401,7 +406,7 @@ void sendText(const char* text) {  //new
   digitalWrite(sendPin, LOW);
 }
 
-
+/*
 void sendTextO_L_D(const char* text) {  //1000 delay works well //same with 50
   vreg_set_voltage(VREG_VOLTAGE_1_30);
   delay(10);
@@ -481,6 +486,7 @@ void sendTextO_L_D(const char* text) {  //1000 delay works well //same with 50
     vreg_set_voltage(VREG_VOLTAGE_0_90);
   }
 }
+*/
 
 
 
@@ -2477,7 +2483,7 @@ void setup() {
   //pinMode(27, OUTPUT);
   pinMode(28, OUTPUT);
 
-  pulseSensor.analogInput(PulseWire);   //27
+  pulseSensor.analogInput(PulseWire);  //27
   pulseSensor.setThreshold(Threshold);
   //pins 27, and 28 are Data Out, and Clock
 
@@ -2887,13 +2893,61 @@ void loop() {
     }
   }
 
-  if(millis()-checkBPM>10000){
+
+  int val = analogRead(PulseWire);
+
+  //int val2 = val / 10;
+  //Serial.println(val);
+
+  /* <<Works SUPER well with finger
+  if (val < 2060 && BeatTrig == false) {//2500
+    beat++;
+    BeatTrig = true;
+    Serial.print("Beat");
+    Serial.println(beat);
+  }
+  if(val > 2100){
+    BeatTrig = false;
+  }
+*/
+  Serial.print("change:");
+  Serial.println((int)min(max(-5,val - lastVal),50)/4);
+  if ((int)min(max(-5,val - lastVal),50)/4 > 4 && !BeatTrig && millis()-lastBeat>600) {//20
+    beat++;
+    BeatTrig = true;
+    lastBeat=millis();
+    Serial.print("Beat:");
+    Serial.println(30);
+  } else if (BeatTrig && (int)min(max(-5,val - lastVal),50)/4 < 1) {//-15
+    BeatTrig = false;
+  } else {
+    Serial.print("Beat:");
+    Serial.println(0);
+  }
+  if (millis() - lastValCheck > 400) {  //150
+    lastValCheck = millis();
+    lastVal = val;
+  }
+  if (millis() - checkBPM > 15000) {
+    checkBPM = millis();
+    BPM = beat * 4;
+    beat = 0;
+  }
+  Serial.print("bpm:");
+  Serial.println(BPM);
+
+
+  
+  //if(millis()-checkBPM>10000){
+  if (pulseSensor.sawStartOfBeat()) {
     checkBPM = millis();
     BPM = pulseSensor.getBeatsPerMinute();
-    if(BPM > 200){
+    Serial.println(BPM);
+    if (BPM > 200) {
       BPM = 200;
     }
   }
+
 
   if (runningAppName == "home") {
     if (dontRunDimAgain == false) {

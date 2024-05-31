@@ -103,7 +103,7 @@ void detectSteps() {
     isStepDetected = false;
   }
 }
-int beat = 0;
+//int beat = 0;
 int startTime = 0;
 int currentTimeR = 0;
 int beatsIn15Sec = 0;
@@ -139,7 +139,8 @@ void CountSteps() {
   int heartRate = beatsIn15Sec * 4;
   */ //^^ REAL OLD
 
-  detectHeartRate();
+  //detectHeartRate();
+  heartRate = BPM;
 
   Paint_DrawRectangle(156, 26, 162, 27, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(153, 27, 165, 28, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
