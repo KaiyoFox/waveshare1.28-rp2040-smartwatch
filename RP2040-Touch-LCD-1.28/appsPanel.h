@@ -10,6 +10,7 @@ extern bool tap;
 extern bool otherSwipe;
 extern bool watchSwipe;
 extern bool startup;
+extern bool scrolling;
 extern int tapHeld;
 extern int scrollY;  // Added scrollY variable
 extern UWORD* BlackImage;
@@ -58,14 +59,17 @@ void appsPanel() {
   //Paint_DrawRectangle(50, 0, 190, 240, 0x39E7, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
   int count = 0;
-  scrollFunction(visibleCount, {}, true);
+  scrollFunctionFull(visibleCount, {}, true);
   visibleCount = 0;  // Track the number of visible apps
   //scrollFunction(apps.size(),{},true);//WARNINGGGGGGGGGGGGGGGGGGGGGG APPS CONTAINS THE HIDDEN APPS< AND MAY BREAK
 
   //int totalHeight = std::accumulate(itemHeights.begin(), itemHeights.end(), 0);
 
   // Determine the modified scrollY value
-  int scrollYModded = (scrollY / 240.0) * (totalHeight + 20);  // + (itemHeights.size() * spacing)
+  //////USED WITH NORMAL SCROLL int scrollYModded = ((scrollY) / 180.0) * (totalHeight + 20);  // + (itemHeights.size() * spacing)
+  scrollY = min(scrollY,totalHeight + 20);
+  int scrollYModded = -scrollY;
+
 
   // Determine the starting index based on scroll position
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
@@ -138,8 +142,8 @@ void appsPanel() {
         Paint_DrawString_EN(startX + 5, y + ((appSize / 2) - 8), key.c_str(), &Font16, DARKGRAY, findTextColor(key.c_str()));  //(x + appLeng) - (std::strlen(key.c_str())*11) - 1,font8 0x009688
         if (inTransition == false && !pauseRender) {
           if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + appLeng && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + appSize) {
-            if (tap && !watchSwipe && !otherSwipe) {
-              if (tapHeld <= 1) {  //tapHeld > 1
+            if (tap && !watchSwipe && !otherSwipe && !scrolling) {
+              if (tapHeld <= 2) {  //tapHeld > 1
                 tap = false;
                 tapHeld = 999;
                 //appPanelAppCalled=true;
