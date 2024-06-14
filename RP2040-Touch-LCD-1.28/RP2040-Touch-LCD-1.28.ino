@@ -8,6 +8,7 @@
 #include <Arduino_JSON.h>
 #include <map>
 #include <string>
+#include <vector>
 #include <list>
 #include <tuple>
 #include <iostream>
@@ -27,6 +28,16 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
 bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);
 bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);
 void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
+
+std::list<std::string> split(const std::string& s, char seperator);
+
+std::list<std::string> listDir(const char* path);
+bool createFolder(const char* path);
+bool createFile(const char* path, const char* data);
+std::string listFileContents(const char* path);
+bool removeFile(const char* path);
+void initializeFileSystem();
+int calculateUsedSpace();
 
 //Builtin-Apps/Processes:
 //include "home.h"
@@ -58,6 +69,7 @@ void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 //Apps V2
 #include "appVersTwo.h"
 #include "appVersTwoTestTwo.h"
+#include "devTerm.h"
 
 
 const int PulseWire = 27;           // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
@@ -211,7 +223,8 @@ unsigned long readFromEEPROM(int addr) {
 
 
 
-#define EEPROM_SIZE 512
+//#define EEPROM_SIZE 512
+int EEPROM_SIZE = 512;
 #define FILE_TABLE_START 5
 #define MAX_FILES 50     //max bytes for file table
 #define MAX_NAME_LEN 15  //Yes its small, Deal with it ABCDEF.EXT (I think this includes folders too, /folder/file.txt ) every character counts towards limit
@@ -222,161 +235,285 @@ enum EntryType {
 };
 
 struct FileTableEntry {
-  char name[MAX_NAME_LEN];
-  EntryType type;
-  int startAddress;
-  int size;  // Size is used only for files
+  char name;  //[MAX_NAME_LEN]
+  int type;   //folder / file
 };
+
 
 void initializeFileSystem() {
   EEPROM.begin(EEPROM_SIZE);
-  for (int i = FILE_TABLE_START; i < FILE_TABLE_START + MAX_FILES * sizeof(FileTableEntry); i++) {
-    EEPROM.write(i, 0xFF);  // Mark all entries as empty
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    EEPROM.write(i, 0xFF);
   }
   EEPROM.commit();
   EEPROM.end();
 
-  createFolder("/");  //create Root
+  createFolder("/");
 }
 
-void createFolder(const char* path) {
+struct FileData {
+  std::string fileName;
+  std::string fileData;
+  bool isFile;
+};
+
+std::vector<FileData> fileSystemBackup;
+void saveFileSystemToRAM() {
   EEPROM.begin(EEPROM_SIZE);
+  fileSystemBackup.clear();
 
-  // Find an empty slot in the file table
-  for (int i = 0; i < MAX_FILES; i++) {
-    int entryAddr = FILE_TABLE_START + i * sizeof(FileTableEntry);
-    FileTableEntry entry;
-    EEPROM.get(entryAddr, entry);
+  std::string fileName = "";
+  std::string fileData = "";
+  bool isFile = false;
 
-    if (entry.name[0] == 0xFF) {  // Empty entry
-      strcpy(entry.name, path);
-      entry.type = FOLDER_TYPE;
-      entry.startAddress = entryAddr + sizeof(FileTableEntry);  // Start address just after the entry
-      entry.size = 0;
-      EEPROM.put(entryAddr, entry);
-      EEPROM.commit();
-      EEPROM.end();
-      Serial.println("Folder created");
-      return;
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty()) {
+        FileData fileEntry;
+        fileEntry.fileName = fileName;
+        fileEntry.fileData = fileData;
+        fileEntry.isFile = isFile;
+        fileSystemBackup.push_back(fileEntry);
+        fileName = "";
+        fileData = "";
+      }
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        fileData += static_cast<char>(EEPROM.read(i));
+        i++;
+      }
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
     }
   }
 
   EEPROM.end();
-  Serial.println("No space left in file table");
 }
-
-void listDir(const char* path) {
+void rewriteFileSystemFromRAM() {
   EEPROM.begin(EEPROM_SIZE);
-  Serial.print("Listing directory: ");
-  Serial.println(path);
 
-  int pathLen = strlen(path);
-
-  // Ensure the path ends with a slash
-  char fullPath[MAX_NAME_LEN];
-  strcpy(fullPath, path);
-  if (fullPath[pathLen - 1] != '/') {
-    strcat(fullPath, "/");
-    pathLen++;
+  int currentPos = FILE_TABLE_START + 1;
+  for (const auto& fileEntry : fileSystemBackup) {
+    EEPROM.write(currentPos++, fileEntry.isFile ? 1 : 0);
+    for (char c : fileEntry.fileName) {
+      EEPROM.write(currentPos++, c);
+    }
+    if (fileEntry.isFile) {
+      EEPROM.write(currentPos, 254);
+      for (char c : fileEntry.fileData) {
+        EEPROM.write(currentPos++, c);
+      }
+    }
+    EEPROM.write(currentPos++, 255);
   }
 
-  for (int i = 0; i < MAX_FILES; i++) {
-    int entryAddr = FILE_TABLE_START + i * sizeof(FileTableEntry);
-    FileTableEntry entry;
-    EEPROM.get(entryAddr, entry);
+  EEPROM.commit();
+  EEPROM.end();
+  fileSystemBackup.clear();
+}
 
-    if (entry.name[0] != 0xFF) {  // Valid entry
-      // Check if the entry is a direct child of the specified directory
-      if (strncmp(entry.name, fullPath, pathLen) == 0) {
-        const char* remainingPath = entry.name + pathLen;
-        if (strchr(remainingPath, '/') == NULL) {  // Ensure no further slashes in the remaining path
-          Serial.print(entry.type == FILE_TYPE ? "File: " : "Folder: ");
-          Serial.println(entry.name + pathLen);  // Print only the name relative to the specified directory
+bool removeFile(const char* path) {
+  saveFileSystemToRAM();
+  for (auto it = fileSystemBackup.begin(); it != fileSystemBackup.end(); ++it) {
+    if (it->fileName == path) {
+      fileSystemBackup.erase(it);
+      initializeFileSystem();      //Format
+      rewriteFileSystemFromRAM();  //Rewrite
+      return true;
+    }
+  }
+  return false;
+}
+
+bool createFolder(const char* path) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  bool canWrite = false;
+  int freeCount = 0;
+  int start = 0;
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    if (canWrite == false) {
+      int val = EEPROM.read(i);
+      if (val == 255) {
+        freeCount++;
+      } else {
+        freeCount = 0;
+      }
+      if (freeCount > 10) {
+        canWrite = true;
+        i = i - 10;
+        start = i;
+      }
+    } else {
+      if (i - start == 1) {
+        EEPROM.write(i, 0x00);
+      } else {
+        if (i - start - 1 <= strlen(path)) {
+          char letter = path[i - start - 2];
+          EEPROM.write(i, letter);
+        } else {
+          EEPROM.commit();
+          EEPROM.end();
+          return true;
         }
       }
     }
   }
 
+  EEPROM.commit();
   EEPROM.end();
+  return false;
 }
 
-void createFile(const char* path, const char* data) {
+bool isDirectChild(const std::string& parentPath, const std::string& entryPath) {
+  std::string parent = parentPath;
+  if (parent.back() != '/') {
+    parent += '/';
+  }
+  return entryPath.find(parent) == 0 && entryPath.find('/', parent.length()) == std::string::npos;
+}
+
+std::list<std::string> listDir(const char* path) {
   EEPROM.begin(EEPROM_SIZE);
 
-  int dataSize = strlen(data);
+  std::list<std::string> files;
+  std::string fileName = "";
+  bool isFile = false;
 
-  // Find an empty slot in the file table
-  for (int i = 0; i < MAX_FILES; i++) {
-    int entryAddr = FILE_TABLE_START + i * sizeof(FileTableEntry);
-    FileTableEntry entry;
-    EEPROM.get(entryAddr, entry);
+  std::string pathStr = path;
+  size_t pathLength = pathStr.length();
 
-    if (entry.name[0] == 0xFF) {  // Empty entry
-      strcpy(entry.name, path);
-      entry.type = FILE_TYPE;
-      entry.startAddress = entryAddr + sizeof(FileTableEntry);
-      entry.size = dataSize;
 
-      // Write the entry to the file table
-      EEPROM.put(entryAddr, entry);
-
-      // Write the file data
-      for (int j = 0; j < dataSize; j++) {
-        EEPROM.write(entry.startAddress + j, data[j]);
-        if (entry.startAddress + j > EEPROM_SIZE) {
-          Serial.println("Max Data Reached");
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty() && fileName.find(path) == 0 && fileName != path && isDirectChild(pathStr, fileName)) {
+        std::string relativePath = fileName.substr(pathStr.length());
+        if (relativePath.empty() || relativePath[0] != '/') {
+          relativePath = '/' + relativePath;
+        }
+        if (isFile) {
+          files.push_back(relativePath);
+        } else {
+          files.push_back(relativePath + '/');
         }
       }
-
-      EEPROM.commit();
-      EEPROM.end();
-      Serial.println("File created");
-      return;
+      fileName = "";
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        i++;
+      }
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
     }
   }
 
   EEPROM.end();
-  Serial.println("No space left in file table");
+  return files;
 }
-void listFileContents(const char* path) {
+
+bool createFile(const char* path, const char* data) {
   EEPROM.begin(EEPROM_SIZE);
 
-  // Iterate over the file table to find the file
-  for (int i = 0; i < MAX_FILES; i++) {
-    int entryAddr = FILE_TABLE_START + i * sizeof(FileTableEntry);
-    FileTableEntry entry;
-    EEPROM.get(entryAddr, entry);
-
-    if (entry.name[0] != 0xFF && entry.type == FILE_TYPE && strcmp(entry.name, path) == 0) {  // Valid file entry with matching path
-      Serial.print("Contents of ");
-      Serial.print(entry.name);
-      Serial.println(":");
-
-      // Read and print the file data
-      for (int j = 0; j < entry.size; j++) {
-        char c = EEPROM.read(entry.startAddress + j);
-        Serial.print(c);
+  int availableStart = -1;
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    if (EEPROM.read(i) == 255) {
+      int requiredSpace = strlen(path) + strlen(data) + 4;
+      int freeSpace = 0;
+      for (int j = i; j < EEPROM_SIZE; j++) {
+        if (EEPROM.read(j) == 255) {
+          freeSpace++;
+        } else {
+          break;
+        }
       }
-      Serial.println();
-      EEPROM.end();
-      return;
+      if (freeSpace > requiredSpace) {
+        availableStart = i + 1; //was +2
+        break;
+      }
+    }
+  }
+
+  if (availableStart == -1) {
+    EEPROM.end();
+    return false;
+  }
+
+  EEPROM.write(availableStart++, 1);
+  for (int i = 0; i < strlen(path); i++) {
+    EEPROM.write(availableStart++, path[i]);
+  }
+  EEPROM.write(availableStart++, 254);
+  for (int i = 0; i < strlen(data); i++) {
+    EEPROM.write(availableStart++, data[i]);
+  }
+  EEPROM.write(availableStart++, 255);
+
+  EEPROM.commit();
+  EEPROM.end();
+  return true;
+}
+
+std::string listFileContents(const char* path) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  std::string fileName = "";
+  std::string data = "";
+  bool isFile = false;
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty()) {
+        if (fileName == path && isFile) {
+          return data;
+        }
+        fileName = "";
+        data = "";
+      }
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        int datVal = EEPROM.read(i);
+        if (datVal != 254 && datVal != 255) {
+          char valCharDat = static_cast<char>(EEPROM.read(i));
+          data += valCharDat;
+        }
+        i++;
+      }
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
     }
   }
 
   EEPROM.end();
-  Serial.println("File not found");
+  return "err";
 }
+
+
 
 int calculateUsedSpace() {
   EEPROM.begin(EEPROM_SIZE);
 
   int usedSpace = 0;
-
+  Serial.println("Data");
   for (int i = 0; i < EEPROM_SIZE; i++) {
+    char chr = EEPROM.read(i);
+    Serial.print(chr);
     if (EEPROM.read(i) != 0xFF) {
       usedSpace++;
     }
   }
+  Serial.println("");
 
   EEPROM.end();
   return usedSpace;
@@ -633,7 +770,7 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
   //}
 
   // Determine if scrolling is happening
-  scrolling = std::abs(lastScrollY-scrollY) > 1 || std::abs(int(scrollV)) > 2; //draggingScrollE || 
+  scrolling = std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 2;  //draggingScrollE ||
 
   // Return values
   std::list<int> resultList;
@@ -2308,7 +2445,7 @@ void errorHandle() {
 void setup() {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
   delay(10);
-  set_sys_clock_khz(400000, true);//set_sys_clock_khz(300000, true);
+  set_sys_clock_khz(400000, true);  //set_sys_clock_khz(300000, true);
   Serial.begin(9600);
   if (DEV_Module_Init() != 0)
     Serial.println("GPIO Init Fail!");
@@ -2370,6 +2507,9 @@ void setup() {
 
   apps["appVersTwoTestTwo"] = &appV2;
   appsV2["appVersTwoTestTwo"] = new appVersTwoTestTwo();
+
+  apps["devTerm"] = &appV2;
+  appsV2["devTerm"] = new devTerm();
   //updateAppNames();
 
   //BLUETOOTH CRAP
@@ -2493,7 +2633,7 @@ int shouldConsiderUpdating = 0;
 int timeInTrans = 0;
 bool alreadySet = true;
 
-void loop() {    //bare min
+void loop() {  //bare min
   if (runningAppName == "home") {
     if (millis() - updateHome > 300000) {
       updateHome = millis();
@@ -2502,7 +2642,7 @@ void loop() {    //bare min
   } else {
     runningApp();
   }
-  checkNotif();  //Check for incoming data
+  //checkNotif();  //Check for incoming data
 
   //Do heart rate stuff, and some little battery saver stuff
 
@@ -2520,11 +2660,14 @@ void loop() {    //bare min
       DEV_SET_PWM(100);
       vreg_set_voltage(VREG_VOLTAGE_1_30);
       set_sys_clock_khz(400000, true);
+
+      /*
       if (millis() - idleTime > autoClock) {
         //lastUsedAppName = runningAppName;
         openApp("home", "RAND");
         idleTime = millis();
       }
+      */
     }
   }
   if (resetTransitionAfterTick) {
@@ -2564,7 +2707,7 @@ void loop() {    //bare min
     tapHeld = 0;
     activeDir = "";
   } else if (tap) {
-    tapHeld ++;
+    tapHeld++;
     idleTime = millis();
     ticksSinceTap++;
   }
