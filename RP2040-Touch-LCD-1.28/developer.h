@@ -2779,6 +2779,8 @@ void developer() {
       Paint_DrawString_EN(53, 50, (std::to_string(buttonDown) + " buttonDown").c_str(), &Font12, BLACK, GREEN);
     }
     slider(50, 150, GRAY, PURPLE, "Idk Some ID", 120, 20);
+
+    textBox(50, 200, WHITE, RED, "Some ID", 120, 40, "Username", true);
   }
 
 

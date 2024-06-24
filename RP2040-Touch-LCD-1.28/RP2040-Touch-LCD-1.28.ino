@@ -25,6 +25,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
 std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible);
 bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size);
 int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height);
+std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass = false);
 bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);
 bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);
 void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
@@ -36,8 +37,11 @@ bool createFolder(const char* path);
 bool createFile(const char* path, const char* data);
 std::string listFileContents(const char* path);
 bool removeFile(const char* path);
+bool removeDir(const char* path);
+bool fileExists(const char* path, bool fileType);
 void initializeFileSystem();
 int calculateUsedSpace();
+int FileSysCalculateUsedSpace();
 
 //Builtin-Apps/Processes:
 //include "home.h"
@@ -123,11 +127,12 @@ std::string lastUsedAppName = "main";
 std::list<float> batVoltages = {};
 std::map<std::list<std::string>, int> specialButtons = {};                    //{"APP","ID", "TYPE"}: VALUE
 std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
+std::map<std::list<std::string>, std::string> specialButtonsExtraString = {};
 int autoClock = 15000;                                                        //Auto clock screen
 std::string error = "";
 std::string swipeComplete = "";
 bool watchSwipe = false;
-int swipeStartThresh = 20;  //was like. 50
+int swipeStartThreshMain = 120;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
 std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time" };
@@ -225,7 +230,7 @@ unsigned long readFromEEPROM(int addr) {
 
 //#define EEPROM_SIZE 512
 int EEPROM_SIZE = 512;
-#define FILE_TABLE_START 5
+int FILE_TABLE_START = 5;
 #define MAX_FILES 50     //max bytes for file table
 #define MAX_NAME_LEN 15  //Yes its small, Deal with it ABCDEF.EXT (I think this includes folders too, /folder/file.txt ) every character counts towards limit
 
@@ -283,6 +288,7 @@ void saveFileSystemToRAM() {
         fileData += static_cast<char>(EEPROM.read(i));
         i++;
       }
+      i--;
     } else if (val == 0 || val == 1) {
       isFile = (val == 1);
     } else {
@@ -316,10 +322,13 @@ void rewriteFileSystemFromRAM() {
   fileSystemBackup.clear();
 }
 
+//MAKE IT SO IN ORDER TO MAKE A FILE / FOLDER INSIDE OF A DIR, THAT DIR MUST EXIST, but make it an optional bool, ObbeyStandard=true default
+//RM, AND RMDIR (MAKE RMDIR RECURRISVE,)
 bool removeFile(const char* path) {
+  std::string pathStr = path;
   saveFileSystemToRAM();
   for (auto it = fileSystemBackup.begin(); it != fileSystemBackup.end(); ++it) {
-    if (it->fileName == path) {
+    if ((it->fileName == pathStr || it->fileName.c_str() == path) && it->isFile == true) {
       fileSystemBackup.erase(it);
       initializeFileSystem();      //Format
       rewriteFileSystemFromRAM();  //Rewrite
@@ -329,7 +338,40 @@ bool removeFile(const char* path) {
   return false;
 }
 
+//MAKE RECURSIVE
+bool removeDir(const char* path) {
+  std::string pathStr = path;
+  saveFileSystemToRAM();
+
+  // Create a new list to store the items to remove
+  std::vector<decltype(fileSystemBackup)::iterator> itemsToRemove;
+
+  // Collect all items that match the path
+  for (auto it = fileSystemBackup.begin(); it != fileSystemBackup.end(); ++it) {
+    // Check if the item's path starts with the given path
+    if (it->fileName.find(pathStr) == 0) {
+      if (((it->fileName == pathStr || it->fileName.c_str() == path) && it->isFile == true) == false) {
+        itemsToRemove.push_back(it);
+      }
+    }
+  }
+
+  // Remove all collected items from the file system
+  for (auto it : itemsToRemove) {
+    fileSystemBackup.erase(it);
+  }
+
+  // Reinitialize the file system after removal
+  initializeFileSystem();      // Format
+  rewriteFileSystemFromRAM();  // Rewrite
+
+  return !itemsToRemove.empty();
+}
+
 bool createFolder(const char* path) {
+  if (fileExists(path, false)) {
+    return false;
+  }
   EEPROM.begin(EEPROM_SIZE);
 
   bool canWrite = false;
@@ -377,6 +419,43 @@ bool isDirectChild(const std::string& parentPath, const std::string& entryPath) 
   return entryPath.find(parent) == 0 && entryPath.find('/', parent.length()) == std::string::npos;
 }
 
+bool fileExists(const char* path, bool fileType) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  std::string fileName = "";
+  bool isFile = false;
+
+  std::string pathStr = path;
+  size_t pathLength = pathStr.length();
+
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty() && fileName.find(path) == 0 && (fileName == path || fileName == pathStr) && fileType == isFile) {  // && isDirectChild(pathStr, fileName)
+        //if (fileName == path || fileName == pathStr) {
+        //  EEPROM.end();
+        return true;
+        //}
+      }
+      fileName = "";
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        i++;
+      }
+      i--;
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
+    }
+  }
+
+  EEPROM.end();
+  return false;
+}
+
 std::list<std::string> listDir(const char* path) {
   EEPROM.begin(EEPROM_SIZE);
 
@@ -407,6 +486,7 @@ std::list<std::string> listDir(const char* path) {
       while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
         i++;
       }
+      i--;
     } else if (val == 0 || val == 1) {
       isFile = (val == 1);
     } else {
@@ -420,6 +500,9 @@ std::list<std::string> listDir(const char* path) {
 }
 
 bool createFile(const char* path, const char* data) {
+  if (fileExists(path, true)) {
+    return false;
+  }
   EEPROM.begin(EEPROM_SIZE);
 
   int availableStart = -1;
@@ -435,7 +518,7 @@ bool createFile(const char* path, const char* data) {
         }
       }
       if (freeSpace > requiredSpace) {
-        availableStart = i + 1; //was +2
+        availableStart = i + 1;  //was +2
         break;
       }
     }
@@ -464,6 +547,7 @@ bool createFile(const char* path, const char* data) {
 std::string listFileContents(const char* path) {
   EEPROM.begin(EEPROM_SIZE);
 
+  std::string pathString = path;
   std::string fileName = "";
   std::string data = "";
   bool isFile = false;
@@ -472,12 +556,13 @@ std::string listFileContents(const char* path) {
     int val = EEPROM.read(i);
     if (val == 255) {
       if (!fileName.empty()) {
-        if (fileName == path && isFile) {
+        if ((fileName == path || fileName == pathString) && isFile) {
           return data;
+        } else {
         }
-        fileName = "";
-        data = "";
       }
+      fileName = "";
+      data = "";
     } else if (val == 254) {
       while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
         int datVal = EEPROM.read(i);
@@ -487,10 +572,11 @@ std::string listFileContents(const char* path) {
         }
         i++;
       }
+      i--;
     } else if (val == 0 || val == 1) {
       isFile = (val == 1);
     } else {
-      char valChar = static_cast<char>(val);
+      char valChar = val;  //static_cast<char>(val)
       fileName += valChar;
     }
   }
@@ -507,6 +593,24 @@ int calculateUsedSpace() {
   int usedSpace = 0;
   Serial.println("Data");
   for (int i = 0; i < EEPROM_SIZE; i++) {
+    char chr = EEPROM.read(i);
+    Serial.print(chr);
+    if (EEPROM.read(i) != 0xFF) {
+      usedSpace++;
+    }
+  }
+  Serial.println("");
+
+  EEPROM.end();
+  return usedSpace;
+}
+
+int FileSysCalculateUsedSpace() {
+  EEPROM.begin(EEPROM_SIZE);
+
+  int usedSpace = 0;
+  Serial.println("Data");
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
     char chr = EEPROM.read(i);
     Serial.print(chr);
     if (EEPROM.read(i) != 0xFF) {
@@ -1138,6 +1242,115 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
   return specialButtons[{ runningAppName, id, "slider" }];
 }
 
+sFONT* getFont(int height) {
+    if (height >= 24) return &Font24;
+    if (height >= 20) return &Font20;
+    if (height >= 16) return &Font16;
+    if (height >= 12) return &Font12;
+    return &Font8;
+}
+
+int encodeText(const std::string& text) {
+    std::ostringstream encodedStream;
+    encodedStream << "9";
+    for (char c : text) {
+        encodedStream << std::to_string((int)c);
+    }
+    return std::stoi(encodedStream.str());
+}
+
+std::string maskedText(const std::string& text) {
+    std::string masked;
+    for (char c : text) {
+        masked += '*';
+    }
+    return masked;
+}
+
+std::string decodeText(int encodedInt) {
+    std::string encodedText = std::to_string(encodedInt);
+    if (encodedText.empty() || encodedText[0] != '9') return "";
+    std::string decoded;
+    for (size_t i = 1; i < encodedText.size(); i += 2) {
+        int charCode = std::stoi(encodedText.substr(i, 2));
+        decoded += (char)charCode;
+    }
+    return decoded;
+}
+
+std::string tappedIdTextBox = "";
+
+std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass) {
+    static std::string currentText = "";
+    bool isTyping = !keyboardTyped.empty();
+    sFONT* Font = getFont(height);
+
+    if (specialButtons.find({ runningAppName, id, "textBox" }) == specialButtons.end()) {
+        Serial.println("Reset");
+        delay(454);
+        specialButtons[{ runningAppName, id, "textBox" }] = 0;  // Initialize state
+        specialButtonsExtraString[{runningAppName, id, "textBox"}] = "";
+        delay(454);
+    }
+
+    // Draw the text box
+    Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x + 2, y + 2, x + width - 2, y + height - 2, InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+        if(tappedIdTextBox == id){
+      if(keyboardTyped!="" || keyboardData !=""){
+        if(keyboardData!=""){
+          keyboardTyped=keyboardData;
+        }
+        Serial.println("SETTTT");
+        specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "45";//encodeText(keyboardTyped);
+        keyboardData="";
+        keyboardTyped="";
+        tappedIdTextBox = "";
+      }
+    }
+
+    if (!inTransition && !pauseRender) {
+        if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + width && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + height) {
+            if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+                otherSwipe = false;
+                watchSwipe = false;
+                miscSwipe = true;
+                inTransition = false;
+                pauseRender = false;
+                scrollV = 0;
+                scrollY = 0;
+
+                // Open the keyboard when the text box is tapped
+                if(specialButtonsExtraString[{ runningAppName, id, "textBox" }]!=""){
+                  keyboardTyped = specialButtons[{ runningAppName, id, "textBox" }];
+                }
+                tappedIdTextBox = id;
+                openApp("keyboard", "DU", 240);
+                keyboardTyped="";
+            }
+        }
+    }
+
+    // Determine text to display
+    std::string displayText;
+    Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+    if (specialButtonsExtraString[{ runningAppName, id, "textBox" }]!="") {
+        displayText = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+        if(pass){
+          displayText=maskedText(displayText);
+        }
+    } else {
+        displayText = defaultText;
+    }
+
+    // Render the current text in the text box
+    Paint_DrawString_EN(x + 5, y + ((height / 2) - (Font->Height / 2)), displayText.c_str(), Font, InsideColor, OutlineColor);
+
+
+    // Return the current text if not empty, otherwise return an empty string
+    return "";
+}
 
 bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size = 30) {
   if (specialButtons.find({ runningAppName, id, "checkBox" }) == specialButtons.end()) {
@@ -1899,6 +2112,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
       appSysConfig();
       if (it == backgroundApps.end()) {
+        /*
         for (auto& [key, value] : specialButtons) {
           std::string appName = key.front();
           std::string buttonGroup = key.back();
@@ -1912,6 +2126,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
             }
           }
         }
+        */
+        Serial.println("hardreset");
+        //specialButtons = {};       //{"APP","ID", "TYPE"}: VALUE
+        //specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
         appLaunch();
       }
     }
@@ -2025,6 +2243,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 }
 
 bool swipe(std::string dir, int thresh) {
+  int swipeStartThresh = 40;
+  if(dir=="left" || dir=="right"){
+    swipeStartThresh = max(min(thresh - 10, swipeStartThreshMain), 0);
+  }
   bool swipeDone = false;
   if (inTransition == false && miscSwipe == false) {
     if (tap == false && otherSwipe == true && swipeComplete == "") {

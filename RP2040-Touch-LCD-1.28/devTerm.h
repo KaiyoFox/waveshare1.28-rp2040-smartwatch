@@ -18,6 +18,7 @@ extern uint16_t deviceMainColorTheme;
 extern uint16_t deviceSecondColorTheme;
 extern uint16_t deviceThirdColorTheme;  // Device Customization Settings [Optional]
 extern int EEPROM_SIZE;
+extern int FILE_TABLE_START;
 
 // Settings:
 extern bool systemDisplayUpdates;  // Default = True
@@ -128,9 +129,11 @@ public:
             lines.push_back("  -Failed");
           }
         } else if (com == "FORMAT") {
+          curDir = "/";
           initializeFileSystem();
           lines.push_back("  -Successful");
         } else if (com == "CD") {
+          std::string pre = curDir;
           if (lastData != com) {
             if (lastData.at(0) != '/') {
               if (curDir == "/") {
@@ -147,7 +150,12 @@ public:
           if (curDir == "" || curDir == " ") {
             curDir = "/";
           }
-          lines.push_back("  -" + curDir);
+          if (fileExists(curDir.c_str(), false) == false) {
+            curDir = pre;
+            lines.push_back("  -Failed");
+          } else {
+            lines.push_back("  -" + curDir);
+          }
         } else if (com == "WRITE") {
           if (data.size() >= 2) {
             auto itE = data.begin();
@@ -180,7 +188,6 @@ public:
             lines.push_back(" -Failed more Args needed.");
           }
         } else if (com == "CAT") {
-          Serial.println(lastData.c_str());
           std::string path = "";
           if (lastData.at(0) != '/') {
             if (curDir == "/") {
@@ -193,10 +200,10 @@ public:
           }
           lines.push_back("  -" + listFileContents(path.c_str()));
         } else if (com == "USED") {
-          int used = calculateUsedSpace();
-          float percent = (float)used / (float)EEPROM_SIZE;
+          int used = FileSysCalculateUsedSpace();//calculateUsedSpace();
+          float percent = (float)used / (float)(EEPROM_SIZE - FILE_TABLE_START);
           percent = (float)percent * 100;
-          lines.push_back(("  -" + std::to_string(calculateUsedSpace()) + "/" + std::to_string(EEPROM_SIZE) + "B " + std::to_string((int)percent)+"%").c_str());
+          lines.push_back(("  -" + std::to_string(used) + "/" + std::to_string( (EEPROM_SIZE - FILE_TABLE_START) ) + "B " + std::to_string((int)percent) + "%").c_str());
         } else if (com == "DIR") {
           lines.push_back(" -" + curDir);
         } else if (com == "RM") {
@@ -216,9 +223,26 @@ public:
           } else {
             lines.push_back(" -Failed");
           }
-        } else if(com=="FILL"){
+        } else if (com == "RMDIR") {
           std::string path = "";
-          lastData="fillFile";
+          if (lastData.at(0) != '/') {
+            if (curDir == "/") {
+              path = curDir + lastData;
+            } else {
+              path = curDir + "/" + lastData;
+            }
+          } else {
+            path = lastData;
+          }
+          bool ae = removeDir(path.c_str());
+          if (ae) {
+            lines.push_back(" -Successful");
+          } else {
+            lines.push_back(" -Failed");
+          }
+        } else if (com == "FILL") {
+          std::string path = "";
+          lastData = "FILL";
           if (lastData.at(0) != '/') {
             if (curDir == "/") {
               path = curDir + lastData;
@@ -229,10 +253,32 @@ public:
             path = lastData;
           }
           bool ae = true;
-          while(ae){
-            ae=createFile(path.c_str(), "AA");
+          while (ae) {
+            ae = createFile(path.c_str(), "AA");
+
+            path = "";
+            lastData = "FILL" + std::to_string(random(999));
+            if (lastData.at(0) != '/') {
+              if (curDir == "/") {
+                path = curDir + lastData;
+              } else {
+                path = curDir + "/" + lastData;
+              }
+            } else {
+              path = lastData;
+            }
           }
           lines.push_back(" -Filled");
+        } else if (com == "RAND") {
+          EEPROM.begin(EEPROM_SIZE);
+          for (int i = 5; i < EEPROM_SIZE; i++) {
+            if (EEPROM.read(i) == 255) {
+              EEPROM.write(i, random(255));
+            }
+          }
+          EEPROM.commit();
+          EEPROM.end();
+          lines.push_back(" -Successful");
         }
       }
     }

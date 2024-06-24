@@ -75,7 +75,7 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
 
       Paint_DrawString_EN(letterX, letterY, row[i].c_str(), &Font16, DARKGRAY, WHITE);
       if (Touch_CTS816.x_point >= keyStartX - 2 && Touch_CTS816.x_point <= keyStartX + keyWidth + 2 && Touch_CTS816.y_point >= keyStartY - 2 && Touch_CTS816.y_point <= keyStartY + keyHeight + 2) {
-        if (tap && tapDown == false) {
+        if (tap && tapDown == false && !otherSwipe) {
           tapDown = true;
           if (row[i] == "<Back") {
             if (keyboardTyped.size() > 0) {
@@ -119,11 +119,15 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
   }
 }
 
+std::string lastAppOnClose = "";
 
 void keyboardR() {
   if (startup) {
     startup = false;
-    keyboardTyped = "";
+    if(lastAppOnClose!=lastUsedAppName){
+      lastAppOnClose = lastUsedAppName;
+      keyboardTyped = "";
+    }
     keyboardData = "";
     //pinMode(D27, OUTPUT);  //16
     //pinMode(D28, OUTPUT);  //18 CLOCK!!
