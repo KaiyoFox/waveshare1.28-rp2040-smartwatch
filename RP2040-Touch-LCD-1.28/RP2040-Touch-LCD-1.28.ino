@@ -128,7 +128,7 @@ std::list<float> batVoltages = {};
 std::map<std::list<std::string>, int> specialButtons = {};                    //{"APP","ID", "TYPE"}: VALUE
 std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
 std::map<std::list<std::string>, std::string> specialButtonsExtraString = {};
-int autoClock = 15000;                                                        //Auto clock screen
+int autoClock = 15000;  //Auto clock screen
 std::string error = "";
 std::string swipeComplete = "";
 bool watchSwipe = false;
@@ -1243,113 +1243,112 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
 }
 
 sFONT* getFont(int height) {
-    if (height >= 24) return &Font24;
-    if (height >= 20) return &Font20;
-    if (height >= 16) return &Font16;
-    if (height >= 12) return &Font12;
-    return &Font8;
+  if (height >= 24) return &Font24;
+  if (height >= 20) return &Font20;
+  if (height >= 16) return &Font16;
+  if (height >= 12) return &Font12;
+  return &Font8;
 }
 
 int encodeText(const std::string& text) {
-    std::ostringstream encodedStream;
-    encodedStream << "9";
-    for (char c : text) {
-        encodedStream << std::to_string((int)c);
-    }
-    return std::stoi(encodedStream.str());
+  std::ostringstream encodedStream;
+  encodedStream << "9";
+  for (char c : text) {
+    encodedStream << std::to_string((int)c);
+  }
+  return std::stoi(encodedStream.str());
 }
 
 std::string maskedText(const std::string& text) {
-    std::string masked;
-    for (char c : text) {
-        masked += '*';
-    }
-    return masked;
+  std::string masked;
+  for (char c : text) {
+    masked += '*';
+  }
+  return masked;
 }
 
 std::string decodeText(int encodedInt) {
-    std::string encodedText = std::to_string(encodedInt);
-    if (encodedText.empty() || encodedText[0] != '9') return "";
-    std::string decoded;
-    for (size_t i = 1; i < encodedText.size(); i += 2) {
-        int charCode = std::stoi(encodedText.substr(i, 2));
-        decoded += (char)charCode;
-    }
-    return decoded;
+  std::string encodedText = std::to_string(encodedInt);
+  if (encodedText.empty() || encodedText[0] != '9') return "";
+  std::string decoded;
+  for (size_t i = 1; i < encodedText.size(); i += 2) {
+    int charCode = std::stoi(encodedText.substr(i, 2));
+    decoded += (char)charCode;
+  }
+  return decoded;
 }
 
 std::string tappedIdTextBox = "";
 
+
 std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass) {
-    static std::string currentText = "";
-    bool isTyping = !keyboardTyped.empty();
-    sFONT* Font = getFont(height);
+  Serial.println(runningAppName.c_str());
+  if (specialButtons.find({ runningAppName, id, "textBox" }) == specialButtons.end() && specialButtons[{ runningAppName, id, "textBox" }] != 1) {
+    Serial.println("Reset");
+    delay(454);
+    specialButtons[{ runningAppName, id, "textBox" }] = 0;  // Initialize state
+    specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "abc";
+    delay(454);
+  }
+  
+    Serial.print("Before change - specialButtonsExtraString: ");
+    Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
 
-    if (specialButtons.find({ runningAppName, id, "textBox" }) == specialButtons.end()) {
-        Serial.println("Reset");
-        delay(454);
-        specialButtons[{ runningAppName, id, "textBox" }] = 0;  // Initialize state
-        specialButtonsExtraString[{runningAppName, id, "textBox"}] = "";
-        delay(454);
-    }
 
-    // Draw the text box
-    Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
-    Paint_DrawRectangle(x + 2, y + 2, x + width - 2, y + height - 2, InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  Paint_DrawRectangle(x + 2, y + 2, x + width - 2, y + height - 2, InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
 
-        if(tappedIdTextBox == id){
-      if(keyboardTyped!="" || keyboardData !=""){
-        if(keyboardData!=""){
-          keyboardTyped=keyboardData;
-        }
-        Serial.println("SETTTT");
-        specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "45";//encodeText(keyboardTyped);
-        keyboardData="";
-        keyboardTyped="";
-        tappedIdTextBox = "";
+  if (tappedIdTextBox == id) {
+    if (!keyboardTyped.empty() || !keyboardData.empty()) {
+      if (!keyboardData.empty()) {
+        keyboardTyped = keyboardData;
+      }
+      Serial.println("SETTTT");
+      if (keyboardTyped != "") {
+        specialButtonsExtraString[{ runningAppName, id, "textBox" }] = keyboardTyped;
+        specialButtons[{ runningAppName, id, "textBox" }] = 1;
+        keyboardData.clear();
+        keyboardTyped.clear();
+        tappedIdTextBox.clear();
       }
     }
+  }
 
-    if (!inTransition && !pauseRender) {
-        if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + width && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + height) {
-            if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
-                otherSwipe = false;
-                watchSwipe = false;
-                miscSwipe = true;
-                inTransition = false;
-                pauseRender = false;
-                scrollV = 0;
-                scrollY = 0;
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + width && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + height) {
+      if (tap && !watchSwipe && !otherSwipe) {
+        otherSwipe = false;
+        watchSwipe = false;
+        miscSwipe = true;
+        inTransition = false;
+        pauseRender = false;
+        scrollV = 0;
+        scrollY = 0;
 
-                // Open the keyboard when the text box is tapped
-                if(specialButtonsExtraString[{ runningAppName, id, "textBox" }]!=""){
-                  keyboardTyped = specialButtons[{ runningAppName, id, "textBox" }];
-                }
-                tappedIdTextBox = id;
-                openApp("keyboard", "DU", 240);
-                keyboardTyped="";
-            }
+        if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
+          keyboardTyped = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
         }
+        tappedIdTextBox = id;
+        openApp("keyboard", "DU", 240);
+      }
     }
+  }
 
-    // Determine text to display
-    std::string displayText;
-    Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
-    if (specialButtonsExtraString[{ runningAppName, id, "textBox" }]!="") {
-        displayText = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
-        if(pass){
-          displayText=maskedText(displayText);
-        }
-    } else {
-        displayText = defaultText;
+  std::string displayText;
+  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+  if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
+    displayText = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+    if (pass) {
+      displayText = maskedText(displayText);
     }
+  } else {
+    displayText = defaultText;
+  }
 
-    // Render the current text in the text box
-    Paint_DrawString_EN(x + 5, y + ((height / 2) - (Font->Height / 2)), displayText.c_str(), Font, InsideColor, OutlineColor);
+  sFONT* Font = getFont(height);
+  Paint_DrawString_EN(x + 5, y + ((height / 2) - (Font->Height / 2)), displayText.c_str(), Font, InsideColor, OutlineColor);
 
-
-    // Return the current text if not empty, otherwise return an empty string
-    return "";
+  return specialButtonsExtraString[{ runningAppName, id, "textBox" }];
 }
 
 bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size = 30) {
@@ -2049,6 +2048,13 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   watchSwipe = false;
   activeDir = "";
 
+
+
+  lastUsedAppName = runningAppName;
+  runningAppName = app;
+
+
+
   speedMode = false;
   idleTime = millis();
 
@@ -2086,6 +2092,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
   funcER = apps[app];
   funcER();
+
+  startup = false;
 
   if (typeOfApp == false) {    //v1
     appPermissions = { "*" };  //Unsafe
@@ -2159,7 +2167,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     transitionRAND(app, typeOfApp);  //transitionDOWNRAND(app);
   }
 
-  lastUsedAppName = runningAppName;
+  ///////////////////lastUsedAppName = runningAppName;
 
   runningAppV1 = apps[app];  //wait so if I define with a type does it make it "local"?
   if (typeOfApp == true) {
@@ -2171,7 +2179,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     //}
   }
 
-  runningAppName = app;
+  //////////////////////////////////////////////////runningAppName = app;
   //Serial.println(app.c_str());
   if (std::find(systemApps.begin(), systemApps.end(), app) == systemApps.end()) {
     if (std::find(backgroundApps.begin(), backgroundApps.end(), app) == backgroundApps.end()) {
@@ -2244,7 +2252,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
 bool swipe(std::string dir, int thresh) {
   int swipeStartThresh = 40;
-  if(dir=="left" || dir=="right"){
+  if (dir == "left" || dir == "right") {
     swipeStartThresh = max(min(thresh - 10, swipeStartThreshMain), 0);
   }
   bool swipeDone = false;

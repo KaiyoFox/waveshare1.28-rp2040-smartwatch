@@ -8,8 +8,8 @@ extern int tapHeld;
 extern int CurTime;
 extern UWORD* BlackImage;
 extern std::list<std::string> backgroundApps;
-extern std::string keyboardData; //Occurs when Enter Pressed
-extern std::string keyboardTyped; //Just in case apps what access to curretnly typed
+extern std::string keyboardData;   //Occurs when Enter Pressed
+extern std::string keyboardTyped;  //Just in case apps what access to curretnly typed
 extern std::string lastUsedAppName;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
@@ -27,7 +27,7 @@ bool tapDown = false;
 
 void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int startX, int startY) {
 
-/*
+  /*
   for (const auto& notification : notifications) {
     auto title = notification.front();
     if (uniqueTitles.find(title) == uniqueTitles.end()) {
@@ -86,7 +86,7 @@ void renderRow(std::string row[], int rowSize, int keyWidth, int keyHeight, int 
           } else if (row[i] == ">>") {
             keyboardData = keyboardTyped;
             keyboardTyped = "";
-            openApp(lastUsedAppName,"UD",0);
+            openApp(lastUsedAppName, "UD", 0);
             /*
             std::string messag = firstItem;  //"8015744494;";
             messag += ";";
@@ -124,9 +124,10 @@ std::string lastAppOnClose = "";
 void keyboardR() {
   if (startup) {
     startup = false;
-    if(lastAppOnClose!=lastUsedAppName){
+    if (lastAppOnClose != lastUsedAppName) {
       lastAppOnClose = lastUsedAppName;
-      keyboardTyped = "";
+      keyboardTyped = "bb";
+      Serial.println("RES");
     }
     keyboardData = "";
     //pinMode(D27, OUTPUT);  //16
@@ -134,8 +135,8 @@ void keyboardR() {
     //pinMode(D26, OUTPUT);  //None, Tell other device to listen to me
     //digitalWrite(D28, LOW);
     //digitalWrite(D26, LOW);
-    
-    
+
+
     //pinMode(rxPin, INPUT);
   }
   int keyWidth = 18;
@@ -176,7 +177,7 @@ void keyboardR() {
   if (inTransition == false) {
     //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
     if (swipe("down", 70)) {
-      openApp(lastUsedAppName, "UD", Touch_CTS816.y_point);//"Messages"
+      openApp(lastUsedAppName, "UD", Touch_CTS816.y_point);  //"Messages"
     }
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 51, BlackImage);
