@@ -261,9 +261,9 @@ void mainScreen() {
     //Bruh I thought I moved this already.-- Swipe MUST be above renders. Why, Because thats how I designed it to run
     //BRUHH this didn't fix it.
     if (swipe("right", 70)) {
-      openApp("Weather", "LR", Touch_CTS816.x_point);
+      openApp("leftWidget", "LR", Touch_CTS816.x_point);  //Weather
     } else if (swipe("left", 70)) {
-      openApp("News", "RL", Touch_CTS816.x_point);
+      openApp("rightWidget", "RL", Touch_CTS816.x_point);  //News
     } else if (swipe("down", 70)) {
       openApp("notifPane", "UD", Touch_CTS816.y_point);
     };

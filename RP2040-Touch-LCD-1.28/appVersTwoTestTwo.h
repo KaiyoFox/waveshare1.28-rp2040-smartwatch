@@ -42,7 +42,7 @@ public:
   void update() override {  // Triggers on each frame
     Paint_DrawRectangle(0, 0, 100, 100, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     if (swipe("left", 70)) {
-      openApp("keyboard","",0);
+      openApp("keyboard", "", 0);
     }
   }
 };

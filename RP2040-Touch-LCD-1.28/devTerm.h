@@ -200,10 +200,10 @@ public:
           }
           lines.push_back("  -" + listFileContents(path.c_str()));
         } else if (com == "USED") {
-          int used = FileSysCalculateUsedSpace();//calculateUsedSpace();
+          int used = FileSysCalculateUsedSpace();  //calculateUsedSpace();
           float percent = (float)used / (float)(EEPROM_SIZE - FILE_TABLE_START);
           percent = (float)percent * 100;
-          lines.push_back(("  -" + std::to_string(used) + "/" + std::to_string( (EEPROM_SIZE - FILE_TABLE_START) ) + "B " + std::to_string((int)percent) + "%").c_str());
+          lines.push_back(("  -" + std::to_string(used) + "/" + std::to_string((EEPROM_SIZE - FILE_TABLE_START)) + "B " + std::to_string((int)percent) + "%").c_str());
         } else if (com == "DIR") {
           lines.push_back(" -" + curDir);
         } else if (com == "RM") {

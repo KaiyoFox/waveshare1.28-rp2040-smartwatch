@@ -67,7 +67,7 @@ void appsPanel() {
 
   // Determine the modified scrollY value
   //////USED WITH NORMAL SCROLL int scrollYModded = ((scrollY) / 180.0) * (totalHeight + 20);  // + (itemHeights.size() * spacing)
-  scrollY = min(scrollY,totalHeight + 20);
+  scrollY = min(scrollY, totalHeight + 20);
   int scrollYModded = -scrollY;
 
 

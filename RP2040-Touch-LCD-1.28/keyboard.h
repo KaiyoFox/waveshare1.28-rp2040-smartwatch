@@ -126,7 +126,7 @@ void keyboardR() {
     startup = false;
     if (lastAppOnClose != lastUsedAppName) {
       lastAppOnClose = lastUsedAppName;
-      keyboardTyped = "bb";
+      keyboardTyped = "";
       Serial.println("RES");
     }
     keyboardData = "";

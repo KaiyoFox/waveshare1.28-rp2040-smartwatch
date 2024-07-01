@@ -2773,9 +2773,9 @@ void developer() {
     radio(50, 20 + 30, GRAY, LIGHTBLUE, "A", 20, "Group1");
     radio(50, 50 + 30, GRAY, LIGHTBLUE, "B", 20, "Group1");
     radio(50, 80 + 30, GRAY, LIGHTBLUE, "C", 20, "Group1");
-    
 
-    if(checkBox(120, 120, LIGHT_GRAY, BLUE, "ID", 30)){
+
+    if (checkBox(120, 120, LIGHT_GRAY, BLUE, "ID", 30)) {
       Paint_DrawString_EN(53, 50, (std::to_string(buttonDown) + " buttonDown").c_str(), &Font12, BLACK, GREEN);
     }
     slider(50, 150, GRAY, PURPLE, "Idk Some ID", 120, 20);

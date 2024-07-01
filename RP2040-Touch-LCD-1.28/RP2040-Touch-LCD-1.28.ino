@@ -135,7 +135,7 @@ bool watchSwipe = false;
 int swipeStartThreshMain = 120;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
-std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time" };
+std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time", "leftWidget", "rightWidget" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
 struct Service {
@@ -196,6 +196,8 @@ uint16_t deviceSecondColorTheme = 0xecfa;  //0xFE6B;
 uint16_t deviceThirdColorTheme = 0xc41a;   //0x06d5;
 bool aod = false;
 bool batSaver = false;
+std::string leftWidget = "Weather";
+std::string rightWidget = "News";
 
 void clearEEPROM(int addr) {
   EEPROM.begin(512);  // Initialize EEPROM
@@ -1290,9 +1292,9 @@ std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::st
     specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "abc";
     delay(454);
   }
-  
-    Serial.print("Before change - specialButtonsExtraString: ");
-    Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+
+  Serial.print("Before change - specialButtonsExtraString: ");
+  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
 
 
   Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
@@ -2495,6 +2497,44 @@ int serviceLastRan = 0;
 int homeAppLowPower = 1000;
 int HourMinSize = 4;
 
+//So basically when you press and hold down, Open the Apps Pannel Screen, and make that app so if the previous running app is main, or boot, then display normally, but if it is anything else, show "Select App" at the top, and when an app is tapped set a std::string tappedApp to the app tapped on, instead of opening it.
+//Make default buttons so it only presses AFTER you let go, .. for reasons (So on press set a buttonTrig to true, and if buttonTrig is true, and tap is false, then tap thatt button)
+void leftWidgetApp() {
+  AppPtr funcLeft = apps[leftWidget];
+  funcLeft();
+
+  if (inTransition == false) {
+    if (swipe("left", 70)) {
+      openApp("main", "RL", Touch_CTS816.x_point);
+    }
+    if (swipe("right", 70)) {
+      openApp("rightWidget", "LR", Touch_CTS816.x_point);
+    }
+    if (tapHeld > 20) {
+      tap = false;
+      openApp("appsPanel", "RAND", 0);
+    }
+  }
+}
+
+void rightWidgetApp() {
+  AppPtr funcLeft = apps[rightWidget];
+  funcLeft();
+
+  if (inTransition == false) {
+    if (swipe("right", 70)) {
+      openApp("main", "LR", Touch_CTS816.x_point);
+    }
+    if (swipe("left", 70)) {
+      openApp("leftWidget", "RL", Touch_CTS816.x_point);
+    }
+    if (tapHeld > 20) {
+      tap = false;
+      openApp("appsPanel", "RAND", 0);
+    }
+  }
+}
+
 void homeExec() {
   AppPtr funcHome = apps["main"];
   inTransition = true;
@@ -2718,6 +2758,8 @@ void setup() {
   apps["keyboard"] = &keyboardR;
   apps["Settings"] = &settings;
   apps["error"] = &errorHandle;
+  apps["leftWidget"] = &leftWidgetApp;
+  apps["rightWidget"] = &rightWidgetApp;
 
   apps["Flappy Bird"] = &flappyBird;
   apps["2048 Puzzle"] = &game;
@@ -2847,7 +2889,7 @@ void setup() {
   if (error != "") {
     openApp("error", "", 0);
   } else {
-    openApp("appsPanel", "RAND");
+    openApp("main", "RAND");  //appsPanel
   }
 
   buttonPressCount = 0;

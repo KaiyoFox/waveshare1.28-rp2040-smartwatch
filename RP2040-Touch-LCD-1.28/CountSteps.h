@@ -65,7 +65,7 @@ void detectHeartRateOld() {
   }
 }
 
-void detectHeartRate(){
+void detectHeartRate() {
   heartRate = BPM;
 }
 
@@ -137,7 +137,8 @@ void CountSteps() {
     startTime = millis();  // Reset the start time
   }
   int heartRate = beatsIn15Sec * 4;
-  */ //^^ REAL OLD
+  */
+  //^^ REAL OLD
 
   //detectHeartRate();
   heartRate = BPM;
