@@ -135,6 +135,10 @@ bool watchSwipe = false;
 int swipeStartThreshMain = 120;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
+
+std::string appOut = ""; //for apps to return results after closing
+std::string appIn = ""; //for apps to take in data before opening
+
 std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time", "leftWidget", "rightWidget" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
@@ -2500,6 +2504,10 @@ int HourMinSize = 4;
 //So basically when you press and hold down, Open the Apps Pannel Screen, and make that app so if the previous running app is main, or boot, then display normally, but if it is anything else, show "Select App" at the top, and when an app is tapped set a std::string tappedApp to the app tapped on, instead of opening it.
 //Make default buttons so it only presses AFTER you let go, .. for reasons (So on press set a buttonTrig to true, and if buttonTrig is true, and tap is false, then tap thatt button)
 void leftWidgetApp() {
+  if(appOut!=""){
+    leftWidget = appOut;
+    appOut="";
+  }
   AppPtr funcLeft = apps[leftWidget];
   funcLeft();
 
@@ -2512,12 +2520,17 @@ void leftWidgetApp() {
     }
     if (tapHeld > 20) {
       tap = false;
+      appOut="";
       openApp("appsPanel", "RAND", 0);
     }
   }
 }
 
 void rightWidgetApp() {
+  if(appOut!=""){
+    leftWidget = appOut;
+    appOut="";
+  }
   AppPtr funcLeft = apps[rightWidget];
   funcLeft();
 
@@ -2530,6 +2543,7 @@ void rightWidgetApp() {
     }
     if (tapHeld > 20) {
       tap = false;
+      appOut="";
       openApp("appsPanel", "RAND", 0);
     }
   }
@@ -2946,6 +2960,8 @@ void loop() {  //bare min
     inTransition = false;
     pauseRender = false;
     resetTransitionAfterTick = false;
+
+    appOut = ""; //I think?
   }
   if (millis() - serviceLastRan > 1800000) {  //Services
     serviceLastRan = millis();

@@ -14,6 +14,8 @@ extern bool scrolling;
 extern int tapHeld;
 extern int scrollY;  // Added scrollY variable
 extern UWORD* BlackImage;
+extern std::string lastUsedAppName;
+extern std::string appOut;
 extern std::list<std::string> systemApps;
 typedef void (*AppPtr)();
 extern std::map<std::string, AppPtr> apps;
@@ -147,7 +149,13 @@ void appsPanel() {
                 tap = false;
                 tapHeld = 999;
                 //appPanelAppCalled=true;
-                openApp(key, "", 0);  //RAND
+                if(lastUsedAppName=="main"){
+                  openApp(key, "", 0);  //RAND
+                } else {
+                  appOut = key;
+                  openApp(lastUsedAppName, "", 0);
+                }
+
                 tap = false;
                 openingAnApp = true;
                 oneTickPause = true;
