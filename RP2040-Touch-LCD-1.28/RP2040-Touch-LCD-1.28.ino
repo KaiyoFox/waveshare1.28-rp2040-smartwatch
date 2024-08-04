@@ -87,6 +87,7 @@ int ticksSinceTap = 0;
 bool inTransition = false;
 bool pauseRender = false;
 bool tap = false;
+bool sysTap = false;
 bool speedMode = false;
 bool otherSwipe = false;
 bool startup = false;
@@ -136,8 +137,8 @@ int swipeStartThreshMain = 120;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
 
-std::string appOut = ""; //for apps to return results after closing
-std::string appIn = ""; //for apps to take in data before opening
+std::string appOut = "";  //for apps to return results after closing
+std::string appIn = "";   //for apps to take in data before opening
 
 std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time", "leftWidget", "rightWidget" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
@@ -679,7 +680,7 @@ bool scrolling = false;
 std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible) {
   // Check scroll speed periodically
   // Handle touch events
-  if (tap) {
+  if (sysTap) {
     if (!draggingScrollE && Touch_CTS816.y_point > scrollY - 5 && Touch_CTS816.y_point < scrollY + 65 && Touch_CTS816.x_point > 180) {
       //Serial.println(true);
       initialTap = Touch_CTS816.y_point;
@@ -739,7 +740,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
   }
 
   // Apply scrolling
-  if (draggingScrollE || std::abs(int(scrollV)) > 1 && oneTickPause == false) {
+  if (draggingScrollE || std::abs(int(scrollV)) >= 1 && oneTickPause == false) {
     scrollY += scrollV;
     scrollV *= friction;
     //Paint_DrawCircle(230-abs((scrollY-(120-29))/4)+1, scrollY+29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
@@ -760,7 +761,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
   //}
 
   // Determine if scrolling is happening
-  scrolling = draggingScrollE || std::abs(int(scrollV)) > 2;
+  scrolling = draggingScrollE || std::abs(int(scrollV)) > 1;
 
   // Return values
   std::list<int> resultList;
@@ -797,7 +798,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
 std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible) {
   // Check scroll speed periodically
   // Handle touch events
-  if (tap) {
+  if (sysTap) {
     if (!draggingScrollE) {
       //Serial.println(true);
       initialTap = Touch_CTS816.y_point;
@@ -859,11 +860,13 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
   //}
 
   // Apply scrolling
-  if (draggingScrollE || std::abs(int(scrollV)) > 1 && oneTickPause == false) {
+  if (draggingScrollE || std::abs(int(scrollV)) >= 1 && oneTickPause == false) {
     scrollY += scrollV;
     scrollV *= friction;
     //Paint_DrawCircle(230-abs((scrollY-(120-29))/4)+1, scrollY+29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
     ////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);  //-abs((scrollY-(120+20))/4)
+  } else {
+    lastScrollY = scrollY;
   }
 
   // Clamp scrollY within bounds
@@ -880,7 +883,7 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
   //}
 
   // Determine if scrolling is happening
-  scrolling = std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 2;  //draggingScrollE ||
+  scrolling = (draggingScrollE && std::abs(lastScrollY - scrollY) > 0) || std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 1;  //draggingScrollE ||
 
   // Return values
   std::list<int> resultList;
@@ -1223,7 +1226,7 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
 
   if (!inTransition && !pauseRender) {
     if (Touch_CTS816.x_point >= x - (height / 2) && Touch_CTS816.x_point <= x + width + (height / 2) && Touch_CTS816.y_point >= y - (height / 2) && Touch_CTS816.y_point <= y + height + (height / 2)) {
-      if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+      if (sysTap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
         otherSwipe = false;
         watchSwipe = false;
         miscSwipe = true;
@@ -1558,8 +1561,8 @@ bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id,
 
 //AFTER FIXING BUTTONS AS TODO SAYS, Add "Toggle Buttons" press the button, stays on, deselect, etc
 bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size) {  //TODO Make size more variable
-  appSize = 45;                                                                                                       //35 Adjust as needed
-  appLeng = 140;                                                                                                      //140
+  int appSize = 45;                                                                                                   //35 Adjust as needed
+  int appLeng = 140;                                                                                                  //140
 
   if (size == 0) {
     Paint_DrawRectangle(x + 18, y + 0, x + 123, y + 1, Color_Foreground, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -1820,7 +1823,7 @@ void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 0;
-  float radVel = 50;
+  float radVel = 60;  //50
   while (radVel > 1 && radius <= 240) {
     radVel = radVel / 1.1;
     radius += radVel;
@@ -1859,7 +1862,7 @@ void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 240;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius >= 0) {
     radVel = radVel / 1.1;
     radius -= radVel;
@@ -1897,7 +1900,7 @@ void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 0;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius <= 240) {
     radVel = radVel / 1.1;
     radius += radVel;
@@ -1934,7 +1937,7 @@ void transitionDU(std::string app, int begin = 240, bool typeOfApp = false) {
   inTransition = true;
 
   float radius = 240;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius >= 0) {
     radVel = radVel / 1.1;
     radius -= radVel;
@@ -2079,6 +2082,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   std::function<void()> appSysConfig;  // for v2 apps
 
   tap = false;
+  sysTap = false;
   tapHeld = 0;
   flag = 0;
   last = 0;
@@ -2240,6 +2244,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   //runningApp();////////////////////////////////////////
   //DEV_Delay_ms(1);
 
+  sysTap = false;
   inTransition = true;
   pauseRender = true;
   resetTransitionAfterTick = true;
@@ -2263,11 +2268,11 @@ bool swipe(std::string dir, int thresh) {
   }
   bool swipeDone = false;
   if (inTransition == false && miscSwipe == false) {
-    if (tap == false && otherSwipe == true && swipeComplete == "") {
+    if (sysTap == false && otherSwipe == true && swipeComplete == "") {
       activeDir = "";
     }
     if (watchSwipe == false) {
-      if (tap == false) {
+      if (sysTap == false) {
         //activeDir="";
         otherSwipe = false;
       } else {
@@ -2346,7 +2351,8 @@ bool swipe(std::string dir, int thresh) {
         }
       }
       if (swipeComplete == activeDir && activeDir != "") {
-        if (tap == false) {
+        if (sysTap == false) {
+          tapHeld = 0;
           if (dir == "down" && (activeDir == "" || activeDir == dir)) {
             if (Touch_CTS816.y_point > thresh) {
               swipeDone = true;
@@ -2388,7 +2394,7 @@ bool swipe(std::string dir, int thresh) {
       }
     }
 
-    if (swipeDone == false && swipeComplete == dir && tap == false) {  //just in case override
+    if (swipeDone == false && swipeComplete == dir && sysTap == false) {  //just in case override
       swipeDone = true;
       swipeComplete = "";
       activeDir = "";
@@ -2504,9 +2510,13 @@ int HourMinSize = 4;
 //So basically when you press and hold down, Open the Apps Pannel Screen, and make that app so if the previous running app is main, or boot, then display normally, but if it is anything else, show "Select App" at the top, and when an app is tapped set a std::string tappedApp to the app tapped on, instead of opening it.
 //Make default buttons so it only presses AFTER you let go, .. for reasons (So on press set a buttonTrig to true, and if buttonTrig is true, and tap is false, then tap thatt button)
 void leftWidgetApp() {
-  if(appOut!=""){
-    leftWidget = appOut;
-    appOut="";
+  if (appOut != "") {
+    if (apps[appOut] != appV2) {
+      leftWidget = appOut;
+    } else {
+      Serial.println("No v2 apps as widgets");
+    }
+    appOut = "";
   }
   AppPtr funcLeft = apps[leftWidget];
   funcLeft();
@@ -2518,21 +2528,24 @@ void leftWidgetApp() {
     if (swipe("right", 70)) {
       openApp("rightWidget", "LR", Touch_CTS816.x_point);
     }
-    if (tapHeld > 20) {
+    if (tapHeld == 15 && !otherSwipe && !miscSwipe) {
       tap = false;
-      appOut="";
+      appOut = "";
       openApp("appsPanel", "RAND", 0);
     }
   }
 }
 
 void rightWidgetApp() {
-  if(appOut!=""){
-    leftWidget = appOut;
-    appOut="";
+  if (appOut != "") {
+    if (apps[appOut] != appV2) {
+      rightWidget = appOut;
+    } else {
+      Serial.println("No v2 apps as widgets");
+    }
   }
-  AppPtr funcLeft = apps[rightWidget];
-  funcLeft();
+  AppPtr funcRight = apps[rightWidget];
+  funcRight();
 
   if (inTransition == false) {
     if (swipe("right", 70)) {
@@ -2541,9 +2554,9 @@ void rightWidgetApp() {
     if (swipe("left", 70)) {
       openApp("leftWidget", "RL", Touch_CTS816.x_point);
     }
-    if (tapHeld > 20) {
+    if (tapHeld == 15 && !otherSwipe && !miscSwipe) {
       tap = false;
-      appOut="";
+      appOut = "";
       openApp("appsPanel", "RAND", 0);
     }
   }
@@ -2551,7 +2564,7 @@ void rightWidgetApp() {
 
 void homeExec() {
   AppPtr funcHome = apps["main"];
-  inTransition = true;
+  //inTransition = true; //? hm,,
   funcHome();
 }
 
@@ -2903,7 +2916,7 @@ void setup() {
   if (error != "") {
     openApp("error", "", 0);
   } else {
-    openApp("main", "RAND");  //appsPanel
+    openApp("main", "RAND");  //appsPanel //main
   }
 
   buttonPressCount = 0;
@@ -2940,20 +2953,29 @@ void loop() {  //bare min
     frameCount = 0;
 
     if (runningAppName == "home") {  //Lower Clock
+      if (!aod) {
+        DEV_SET_PWM(0);
+      } else {
+        DEV_SET_PWM(20);
+      }
       set_sys_clock_khz(32000, true);
       vreg_set_voltage(VREG_VOLTAGE_0_90);
     } else {  //consider batSaver
       DEV_SET_PWM(100);
-      vreg_set_voltage(VREG_VOLTAGE_1_30);
-      set_sys_clock_khz(400000, true);
 
-      /*
+      if (batSaver) {
+        set_sys_clock_khz(132000, true);
+        vreg_set_voltage(VREG_VOLTAGE_0_90);
+      } else {
+        vreg_set_voltage(VREG_VOLTAGE_1_30);
+        set_sys_clock_khz(400000, true);
+      }
+
       if (millis() - idleTime > autoClock) {
         //lastUsedAppName = runningAppName;
         openApp("home", "RAND");
         idleTime = millis();
       }
-      */
     }
   }
   if (resetTransitionAfterTick) {
@@ -2961,7 +2983,7 @@ void loop() {  //bare min
     pauseRender = false;
     resetTransitionAfterTick = false;
 
-    appOut = ""; //I think?
+    appOut = "";  //I think?
   }
   if (millis() - serviceLastRan > 1800000) {  //Services
     serviceLastRan = millis();
@@ -2985,16 +3007,19 @@ void loop() {  //bare min
     timeSinceLastButton = millis();
   }
 
-
-  if (ticksSinceTap > 1 && tap) {  //Tap Stuff
-    tap = false;
+  tap = false;                        //reset after 1 tick
+  if (ticksSinceTap > 1 && sysTap) {  //Tap Stuff
+    sysTap = false;
+    if (!scrolling && !otherSwipe && !miscSwipe && tapHeld < 10) {
+      tap = true;
+    }
     watchSwipe = false;
     otherSwipe = false;
     miscSwipe = false;
     ticksSinceTap = 0;
     tapHeld = 0;
     activeDir = "";
-  } else if (tap) {
+  } else if (sysTap) {
     tapHeld++;
     idleTime = millis();
     ticksSinceTap++;
@@ -3419,7 +3444,7 @@ void loopOLD() {
 void Touch_INT_callback() {
   if (inTransition == false) {  // && runningAppName!="home"
     CST816S_Get_Point();
-    tap = true;
+    sysTap = true;
     ticksSinceTap = 0;
     flag = 1;
     if (initalYPos == -1) {

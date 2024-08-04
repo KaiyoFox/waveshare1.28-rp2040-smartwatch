@@ -186,8 +186,8 @@ void mainScreen() {
   //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
   //was 4
 
-  uint16_t hour_x = 120 + (60 * sin(((hours % 12) * 30 + 0) * PI / 180));
-  uint16_t hour_y = 120 - (60 * cos(((hours % 12) * 30 + 0) * PI / 180));
+  uint16_t hour_x = 120 + (70 * sin(((hours % 12) * 30 + 0) * PI / 180));
+  uint16_t hour_y = 120 - (70 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
   //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
   //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
@@ -215,15 +215,15 @@ void mainScreen() {
 
 
   for (int i = 0; i < 12; ++i) {
-    uint16_t hour_x_tic = 120 + (80 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic = 120 - (80 * cos(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_x_tic = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
 
-    uint16_t hour_x_tic_short = 120 + (75 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic_short = 120 - (75 * cos(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_x_tic_short = 120 + (82 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic_short = 120 - (82 * cos(((i % 12) * 30 + 0) * PI / 180));
 
     if (i == preHours) {
-      uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
-      uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
       //int lengthOfHr = std::to_string(hours).length();
       //Paint_DrawString_EN(hour_x_mark - ((lengthOfHr * 14) / 2), hour_y_mark + get_yshift(preHours), std::to_string(hours).c_str(), &Font20, BLACK, deviceMainColorTheme);
       Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);

@@ -283,7 +283,7 @@ public:
       }
     }
     renderLines();
-    if (tap && tapHeld > 10) {
+    if (tapHeld > 10) {  //(was tap&&tapHeld ,, so other apps might be the same)
       openApp("keyboard", "DU", 0);
     }
   }

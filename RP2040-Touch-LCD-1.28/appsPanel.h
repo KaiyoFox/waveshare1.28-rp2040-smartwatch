@@ -25,9 +25,9 @@ bool button(int x, int y, std::string text);
 uint16_t findTextColor(const std::string& text);
 #endif
 
-int appSize = 45;     //35 Adjust as needed
-int appLeng = 140;    //140
-int startX = 25;      // Adjust as needed
+int appSize = 60;     //45;     //35 Adjust as needed
+int appLeng = 192;    //140
+int startX = 23;      // for old 25;      // Adjust as needed
 int startY = 35;      // Adjust as needed
 int spacing = 5;      //10  Adjust as needed
 int columns = 3;      // Adjust as needed
@@ -61,8 +61,8 @@ void appsPanel() {
   //Paint_DrawRectangle(50, 0, 190, 240, 0x39E7, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
   int count = 0;
-  scrollFunctionFull(visibleCount, {}, true);
-  visibleCount = 0;  // Track the number of visible apps
+  scrollFunctionFull(totalHeight / (appSize + spacing), {}, true);  //visibleCount
+  visibleCount = 0;                                                 // Track the number of visible apps
   //scrollFunction(apps.size(),{},true);//WARNINGGGGGGGGGGGGGGGGGGGGGG APPS CONTAINS THE HIDDEN APPS< AND MAY BREAK
 
   //int totalHeight = std::accumulate(itemHeights.begin(), itemHeights.end(), 0);
@@ -75,6 +75,12 @@ void appsPanel() {
 
   // Determine the starting index based on scroll position
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
+
+  if (lastUsedAppName == "main") {
+    Paint_DrawString_EN(98, (30 + startY + (visibleCount + -1) * (appSize + spacing) - scrollYModded) + ((appSize / 2) - 8), "Apps", &Font16, BLACK, WHITE);
+  } else {
+    Paint_DrawString_EN(65, (30 + startY + (visibleCount + -1) * (appSize + spacing) - scrollYModded) + ((appSize / 2) - 8), "Select App", &Font16, BLACK, WHITE);
+  }
 
   // Render apps in a list, starting from the calculated start index
   for (auto it = std::next(apps.begin(), startIndex); it != apps.end(); ++it) {
@@ -89,7 +95,7 @@ void appsPanel() {
 
         //Paint_DrawRectangle(x + appLeng, max(0, min(240, y + 3)), x + appLeng - 4, max(0, min(240, y + appSize - 3)), findTextColor(key.c_str()), DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-
+        /*
         Paint_DrawRectangle(x + 18, y + 0, x + 123, y + 1, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawRectangle(x + 12, y + 1, x + 128, y + 2, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawRectangle(x + 11, y + 2, x + 129, y + 3, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -134,14 +140,42 @@ void appsPanel() {
         Paint_DrawRectangle(x + 11, y + 41, x + 130, y + 42, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawRectangle(x + 13, y + 42, x + 128, y + 43, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawRectangle(x + 15, y + 43, x + 127, y + 44, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
+*/
+        Paint_DrawRectangle(x + 23, y + 1, x + 173, y + 3, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 17, y + 3, x + 179, y + 5, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 13, y + 5, x + 183, y + 7, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 9, y + 7, x + 185, y + 9, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 9, y + 9, x + 187, y + 11, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 7, y + 11, x + 189, y + 13, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 5, y + 13, x + 191, y + 15, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 5, y + 15, x + 191, y + 17, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 3, y + 17, x + 193, y + 19, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 3, y + 19, x + 193, y + 21, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 21, x + 193, y + 23, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 23, x + 195, y + 25, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 25, x + 195, y + 27, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 27, x + 195, y + 29, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 29, x + 195, y + 31, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 31, x + 195, y + 33, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 33, x + 195, y + 35, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 1, y + 35, x + 193, y + 37, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 3, y + 37, x + 193, y + 39, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 3, y + 39, x + 193, y + 41, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 3, y + 41, x + 193, y + 43, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 5, y + 43, x + 191, y + 45, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 5, y + 45, x + 189, y + 47, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 7, y + 47, x + 189, y + 49, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 9, y + 49, x + 187, y + 51, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 11, y + 51, x + 185, y + 53, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 13, y + 53, x + 181, y + 55, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawRectangle(x + 19, y + 55, x + 177, y + 57, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
         //was font 16
 
 
         //y + appSize - (16 + 5)
         //startX + 5
-        Paint_DrawString_EN(startX + 5, y + ((appSize / 2) - 8), key.c_str(), &Font16, DARKGRAY, findTextColor(key.c_str()));  //(x + appLeng) - (std::strlen(key.c_str())*11) - 1,font8 0x009688
+        Paint_DrawString_EN(startX + 10, y + ((appSize / 2) - 10), key.c_str(), &Font20, DARKGRAY, findTextColor(key.c_str()));  //(x + appLeng) - (std::strlen(key.c_str())*11) - 1,font8 0x009688
         if (inTransition == false && !pauseRender) {
           if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + appLeng && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + appSize) {
             if (tap && !watchSwipe && !otherSwipe && !scrolling) {
@@ -149,7 +183,7 @@ void appsPanel() {
                 tap = false;
                 tapHeld = 999;
                 //appPanelAppCalled=true;
-                if(lastUsedAppName=="main"){
+                if (lastUsedAppName == "main") {
                   openApp(key, "", 0);  //RAND
                 } else {
                   appOut = key;

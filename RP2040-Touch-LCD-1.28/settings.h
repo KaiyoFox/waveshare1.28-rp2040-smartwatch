@@ -271,6 +271,17 @@ void settings() {
     Paint_DrawString_EN(25, yp + 50, "Battery Saver turns", &Font12, BLACK, WHITE);
     Paint_DrawString_EN(25, yp + 50 + 13, "off AOD and limits", &Font12, BLACK, WHITE);
     Paint_DrawString_EN(25, yp + 50 + 13 + 13, "peak clock speed.", &Font12, BLACK, WHITE);
+
+
+
+    if (button(10, yp + 89, (batSaver ? "SUPSAV: On" : "SUPSAV: Off"), &Font20, DARKGRAY, WHITE, 1)) {
+      batSaver = !batSaver;
+    }
+
+    Paint_DrawString_EN(25, yp + 50 + 89, "SUP Battery Saver", &Font12, BLACK, WHITE);
+    Paint_DrawString_EN(25, yp + 50 + 89 + 13, "only displays a clock", &Font12, BLACK, WHITE);
+    Paint_DrawString_EN(25, yp + 50 + 89 + 13 + 13, "and limits speed.", &Font12, BLACK, WHITE);
+
   } else if (page == "system") {
     //yp = 45;
     scrollFunction(4, {}, true);
