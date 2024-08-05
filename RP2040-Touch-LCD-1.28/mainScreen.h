@@ -14,6 +14,7 @@ extern uint16_t deviceThirdColorTheme;
 extern UWORD *BlackImage;
 extern bool BLEconnected;
 extern std::string weatherTemp;
+extern std::string runningAppName;
 bool swipe(std::string dir, int thresh);
 void saveToEEPROMX(unsigned long data, int addr);
 void openApp(std::string app, std::string dir, int start);
@@ -186,8 +187,8 @@ void mainScreen() {
   //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
   //was 4
 
-  uint16_t hour_x = 120 + (60 * sin(((hours % 12) * 30 + 0) * PI / 180));
-  uint16_t hour_y = 120 - (60 * cos(((hours % 12) * 30 + 0) * PI / 180));
+  uint16_t hour_x = 120 + (70 * sin(((hours % 12) * 30 + 0) * PI / 180));
+  uint16_t hour_y = 120 - (70 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
   //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
   //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
@@ -196,12 +197,12 @@ void mainScreen() {
   //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
   int weathLen = weatherTemp.length();
-  Paint_DrawImage1(Sun, 120 - 8, 140, 16, 16, YELLOW);
-  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 156, weatherTemp.c_str(), &Font12, BLACK, GRAY);
+  Paint_DrawImage1(Sun, 120 - 8, 160, 16, 16, YELLOW);
+  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 178, weatherTemp.c_str(), &Font12, BLACK, GRAY);
 
   String dateStr = dayOfWeek + ", " + monthName + " " + day;
   int lengthOfDate = dateStr.length();
-  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 19, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
+  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 60, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
 
 
   Paint_DrawLine(120, 120, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
@@ -215,15 +216,15 @@ void mainScreen() {
 
 
   for (int i = 0; i < 12; ++i) {
-    uint16_t hour_x_tic = 120 + (80 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic = 120 - (80 * cos(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_x_tic = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
 
-    uint16_t hour_x_tic_short = 120 + (75 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic_short = 120 - (75 * cos(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_x_tic_short = 120 + (82 * sin(((i % 12) * 30 + 0) * PI / 180));
+    uint16_t hour_y_tic_short = 120 - (82 * cos(((i % 12) * 30 + 0) * PI / 180));
 
     if (i == preHours) {
-      uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
-      uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
+      //uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
       //int lengthOfHr = std::to_string(hours).length();
       //Paint_DrawString_EN(hour_x_mark - ((lengthOfHr * 14) / 2), hour_y_mark + get_yshift(preHours), std::to_string(hours).c_str(), &Font20, BLACK, deviceMainColorTheme);
       Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
@@ -233,7 +234,9 @@ void mainScreen() {
   }
 
   //was 8
-  Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  if (runningAppName != "home") {
+    Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  }
 
   //  Paint_DrawString_EN(70, 190, (std::to_string(day)).c_str(), &Font16, BLACK, deviceThirdColorTheme);
 
@@ -261,9 +264,9 @@ void mainScreen() {
     //Bruh I thought I moved this already.-- Swipe MUST be above renders. Why, Because thats how I designed it to run
     //BRUHH this didn't fix it.
     if (swipe("right", 70)) {
-      openApp("Weather", "LR", Touch_CTS816.x_point);
+      openApp("leftWidget", "LR", Touch_CTS816.x_point);  //Weather
     } else if (swipe("left", 70)) {
-      openApp("News", "RL", Touch_CTS816.x_point);
+      openApp("rightWidget", "RL", Touch_CTS816.x_point);  //News
     } else if (swipe("down", 70)) {
       openApp("notifPane", "UD", Touch_CTS816.y_point);
     };

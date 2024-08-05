@@ -8,24 +8,40 @@
 #include <Arduino_JSON.h>
 #include <map>
 #include <string>
+#include <vector>
 #include <list>
 #include <tuple>
 #include <iostream>
 #include <chrono>
+#include <PulseSensorPlayground.h>
 
 void renderSnack();
-void systemTime();  //Might remove, and just make users do snackRender or wahtever, and make it optional
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
 std::string internet_get(std::string url);
 void internet_post(std::string toilet, std::string data);
 bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size);
 std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible);
+std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible);
 bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size);
 int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height);
+std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass = false);
 bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id, int size);
 bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size, std::string group);
 void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
+
+std::list<std::string> split(const std::string& s, char seperator);
+
+std::list<std::string> listDir(const char* path);
+bool createFolder(const char* path);
+bool createFile(const char* path, const char* data);
+std::string listFileContents(const char* path);
+bool removeFile(const char* path);
+bool removeDir(const char* path);
+bool fileExists(const char* path, bool fileType);
+void initializeFileSystem();
+int calculateUsedSpace();
+int FileSysCalculateUsedSpace();
 
 //Builtin-Apps/Processes:
 //include "home.h"
@@ -57,8 +73,12 @@ void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 //Apps V2
 #include "appVersTwo.h"
 #include "appVersTwoTestTwo.h"
+#include "devTerm.h"
 
 
+const int PulseWire = 27;           // PulseSensor PURPLE WIRE connected to ANALOG PIN 0
+int Threshold = 550;                //3000;               //510;                //550           // Determine which Signal to "count as a beat" and which to ignore.
+PulseSensorPlayground pulseSensor;  // Creates an instance of the PulseSensorPlayground object called "pulseSensor"
 int address = 1;
 int CurTime;
 int last = 0;
@@ -67,6 +87,7 @@ int ticksSinceTap = 0;
 bool inTransition = false;
 bool pauseRender = false;
 bool tap = false;
+bool sysTap = false;
 bool speedMode = false;
 bool otherSwipe = false;
 bool startup = false;
@@ -107,14 +128,19 @@ std::string lastUsedAppName = "main";
 std::list<float> batVoltages = {};
 std::map<std::list<std::string>, int> specialButtons = {};                    //{"APP","ID", "TYPE"}: VALUE
 std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
-int autoClock = 15000;                                                        //Auto clock screen
+std::map<std::list<std::string>, std::string> specialButtonsExtraString = {};
+int autoClock = 15000;  //Auto clock screen
 std::string error = "";
 std::string swipeComplete = "";
 bool watchSwipe = false;
-int swipeStartThresh = 10;  //was like. 50
+int swipeStartThreshMain = 120;  //was like. 50
 //bool swipeDone = false;
 std::string activeDir = "";
-std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time" };
+
+std::string appOut = "";  //for apps to return results after closing
+std::string appIn = "";   //for apps to take in data before opening
+
+std::list<std::string> systemApps = { "home", "main", "notifPane", "appsPanel", "recentApps", "previewNotif", "keyboard", "setTime", "error", "Set Time", "leftWidget", "rightWidget" };
 std::list<std::string> backgroundApps = {};  //{"flappyBird"};
 typedef void (*ServiceFunction)();           //services
 struct Service {
@@ -153,7 +179,7 @@ void runningApp() {
     runningAppV1();
   }
   if (systemDisplayUpdates) {
-    systemTime();
+    renderSnack();
   }
   if (systemDisplayUpdates && pauseRender == false && inTransition == false) {
     LCD_1IN28_Display(BlackImage);
@@ -175,6 +201,9 @@ uint16_t deviceSecondColorTheme = 0xecfa;  //0xFE6B;
 uint16_t deviceThirdColorTheme = 0xc41a;   //0x06d5;
 bool aod = false;
 bool batSaver = false;
+int displayBright = 25;
+std::string leftWidget = "Weather";
+std::string rightWidget = "News";
 
 void clearEEPROM(int addr) {
   EEPROM.begin(512);  // Initialize EEPROM
@@ -199,6 +228,421 @@ unsigned long readFromEEPROM(int addr) {
   return dataOut;
 }
 
+
+
+
+
+
+
+
+
+//#define EEPROM_SIZE 512
+int EEPROM_SIZE = 512;
+int FILE_TABLE_START = 5;
+#define MAX_FILES 50     //max bytes for file table
+#define MAX_NAME_LEN 15  //Yes its small, Deal with it ABCDEF.EXT (I think this includes folders too, /folder/file.txt ) every character counts towards limit
+
+enum EntryType {
+  FILE_TYPE,
+  FOLDER_TYPE
+};
+
+struct FileTableEntry {
+  char name;  //[MAX_NAME_LEN]
+  int type;   //folder / file
+};
+
+
+void initializeFileSystem() {
+  EEPROM.begin(EEPROM_SIZE);
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    EEPROM.write(i, 0xFF);
+  }
+  EEPROM.commit();
+  EEPROM.end();
+
+  createFolder("/");
+}
+
+struct FileData {
+  std::string fileName;
+  std::string fileData;
+  bool isFile;
+};
+
+std::vector<FileData> fileSystemBackup;
+void saveFileSystemToRAM() {
+  EEPROM.begin(EEPROM_SIZE);
+  fileSystemBackup.clear();
+
+  std::string fileName = "";
+  std::string fileData = "";
+  bool isFile = false;
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty()) {
+        FileData fileEntry;
+        fileEntry.fileName = fileName;
+        fileEntry.fileData = fileData;
+        fileEntry.isFile = isFile;
+        fileSystemBackup.push_back(fileEntry);
+        fileName = "";
+        fileData = "";
+      }
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        fileData += static_cast<char>(EEPROM.read(i));
+        i++;
+      }
+      i--;
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
+    }
+  }
+
+  EEPROM.end();
+}
+void rewriteFileSystemFromRAM() {
+  EEPROM.begin(EEPROM_SIZE);
+
+  int currentPos = FILE_TABLE_START + 1;
+  for (const auto& fileEntry : fileSystemBackup) {
+    EEPROM.write(currentPos++, fileEntry.isFile ? 1 : 0);
+    for (char c : fileEntry.fileName) {
+      EEPROM.write(currentPos++, c);
+    }
+    if (fileEntry.isFile) {
+      EEPROM.write(currentPos, 254);
+      for (char c : fileEntry.fileData) {
+        EEPROM.write(currentPos++, c);
+      }
+    }
+    EEPROM.write(currentPos++, 255);
+  }
+
+  EEPROM.commit();
+  EEPROM.end();
+  fileSystemBackup.clear();
+}
+
+//MAKE IT SO IN ORDER TO MAKE A FILE / FOLDER INSIDE OF A DIR, THAT DIR MUST EXIST, but make it an optional bool, ObbeyStandard=true default
+//RM, AND RMDIR (MAKE RMDIR RECURRISVE,)
+bool removeFile(const char* path) {
+  std::string pathStr = path;
+  saveFileSystemToRAM();
+  for (auto it = fileSystemBackup.begin(); it != fileSystemBackup.end(); ++it) {
+    if ((it->fileName == pathStr || it->fileName.c_str() == path) && it->isFile == true) {
+      fileSystemBackup.erase(it);
+      initializeFileSystem();      //Format
+      rewriteFileSystemFromRAM();  //Rewrite
+      return true;
+    }
+  }
+  return false;
+}
+
+//MAKE RECURSIVE
+bool removeDir(const char* path) {
+  std::string pathStr = path;
+  saveFileSystemToRAM();
+
+  // Create a new list to store the items to remove
+  std::vector<decltype(fileSystemBackup)::iterator> itemsToRemove;
+
+  // Collect all items that match the path
+  for (auto it = fileSystemBackup.begin(); it != fileSystemBackup.end(); ++it) {
+    // Check if the item's path starts with the given path
+    if (it->fileName.find(pathStr) == 0) {
+      if (((it->fileName == pathStr || it->fileName.c_str() == path) && it->isFile == true) == false) {
+        itemsToRemove.push_back(it);
+      }
+    }
+  }
+
+  // Remove all collected items from the file system
+  for (auto it : itemsToRemove) {
+    fileSystemBackup.erase(it);
+  }
+
+  // Reinitialize the file system after removal
+  initializeFileSystem();      // Format
+  rewriteFileSystemFromRAM();  // Rewrite
+
+  return !itemsToRemove.empty();
+}
+
+bool createFolder(const char* path) {
+  if (fileExists(path, false)) {
+    return false;
+  }
+  EEPROM.begin(EEPROM_SIZE);
+
+  bool canWrite = false;
+  int freeCount = 0;
+  int start = 0;
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    if (canWrite == false) {
+      int val = EEPROM.read(i);
+      if (val == 255) {
+        freeCount++;
+      } else {
+        freeCount = 0;
+      }
+      if (freeCount > 10) {
+        canWrite = true;
+        i = i - 10;
+        start = i;
+      }
+    } else {
+      if (i - start == 1) {
+        EEPROM.write(i, 0x00);
+      } else {
+        if (i - start - 1 <= strlen(path)) {
+          char letter = path[i - start - 2];
+          EEPROM.write(i, letter);
+        } else {
+          EEPROM.commit();
+          EEPROM.end();
+          return true;
+        }
+      }
+    }
+  }
+
+  EEPROM.commit();
+  EEPROM.end();
+  return false;
+}
+
+bool isDirectChild(const std::string& parentPath, const std::string& entryPath) {
+  std::string parent = parentPath;
+  if (parent.back() != '/') {
+    parent += '/';
+  }
+  return entryPath.find(parent) == 0 && entryPath.find('/', parent.length()) == std::string::npos;
+}
+
+bool fileExists(const char* path, bool fileType) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  std::string fileName = "";
+  bool isFile = false;
+
+  std::string pathStr = path;
+  size_t pathLength = pathStr.length();
+
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty() && fileName.find(path) == 0 && (fileName == path || fileName == pathStr) && fileType == isFile) {  // && isDirectChild(pathStr, fileName)
+        //if (fileName == path || fileName == pathStr) {
+        //  EEPROM.end();
+        return true;
+        //}
+      }
+      fileName = "";
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        i++;
+      }
+      i--;
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
+    }
+  }
+
+  EEPROM.end();
+  return false;
+}
+
+std::list<std::string> listDir(const char* path) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  std::list<std::string> files;
+  std::string fileName = "";
+  bool isFile = false;
+
+  std::string pathStr = path;
+  size_t pathLength = pathStr.length();
+
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty() && fileName.find(path) == 0 && fileName != path && isDirectChild(pathStr, fileName)) {
+        std::string relativePath = fileName.substr(pathStr.length());
+        if (relativePath.empty() || relativePath[0] != '/') {
+          relativePath = '/' + relativePath;
+        }
+        if (isFile) {
+          files.push_back(relativePath);
+        } else {
+          files.push_back(relativePath + '/');
+        }
+      }
+      fileName = "";
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        i++;
+      }
+      i--;
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = static_cast<char>(val);
+      fileName += valChar;
+    }
+  }
+
+  EEPROM.end();
+  return files;
+}
+
+bool createFile(const char* path, const char* data) {
+  if (fileExists(path, true)) {
+    return false;
+  }
+  EEPROM.begin(EEPROM_SIZE);
+
+  int availableStart = -1;
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    if (EEPROM.read(i) == 255) {
+      int requiredSpace = strlen(path) + strlen(data) + 4;
+      int freeSpace = 0;
+      for (int j = i; j < EEPROM_SIZE; j++) {
+        if (EEPROM.read(j) == 255) {
+          freeSpace++;
+        } else {
+          break;
+        }
+      }
+      if (freeSpace > requiredSpace) {
+        availableStart = i + 1;  //was +2
+        break;
+      }
+    }
+  }
+
+  if (availableStart == -1) {
+    EEPROM.end();
+    return false;
+  }
+
+  EEPROM.write(availableStart++, 1);
+  for (int i = 0; i < strlen(path); i++) {
+    EEPROM.write(availableStart++, path[i]);
+  }
+  EEPROM.write(availableStart++, 254);
+  for (int i = 0; i < strlen(data); i++) {
+    EEPROM.write(availableStart++, data[i]);
+  }
+  EEPROM.write(availableStart++, 255);
+
+  EEPROM.commit();
+  EEPROM.end();
+  return true;
+}
+
+std::string listFileContents(const char* path) {
+  EEPROM.begin(EEPROM_SIZE);
+
+  std::string pathString = path;
+  std::string fileName = "";
+  std::string data = "";
+  bool isFile = false;
+
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    int val = EEPROM.read(i);
+    if (val == 255) {
+      if (!fileName.empty()) {
+        if ((fileName == path || fileName == pathString) && isFile) {
+          return data;
+        } else {
+        }
+      }
+      fileName = "";
+      data = "";
+    } else if (val == 254) {
+      while (i < EEPROM_SIZE && EEPROM.read(i) != 255) {
+        int datVal = EEPROM.read(i);
+        if (datVal != 254 && datVal != 255) {
+          char valCharDat = static_cast<char>(EEPROM.read(i));
+          data += valCharDat;
+        }
+        i++;
+      }
+      i--;
+    } else if (val == 0 || val == 1) {
+      isFile = (val == 1);
+    } else {
+      char valChar = val;  //static_cast<char>(val)
+      fileName += valChar;
+    }
+  }
+
+  EEPROM.end();
+  return "err";
+}
+
+
+
+int calculateUsedSpace() {
+  EEPROM.begin(EEPROM_SIZE);
+
+  int usedSpace = 0;
+  Serial.println("Data");
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    char chr = EEPROM.read(i);
+    Serial.print(chr);
+    if (EEPROM.read(i) != 0xFF) {
+      usedSpace++;
+    }
+  }
+  Serial.println("");
+
+  EEPROM.end();
+  return usedSpace;
+}
+
+int FileSysCalculateUsedSpace() {
+  EEPROM.begin(EEPROM_SIZE);
+
+  int usedSpace = 0;
+  Serial.println("Data");
+  for (int i = FILE_TABLE_START; i < EEPROM_SIZE; i++) {
+    char chr = EEPROM.read(i);
+    Serial.print(chr);
+    if (EEPROM.read(i) != 0xFF) {
+      usedSpace++;
+    }
+  }
+  Serial.println("");
+
+  EEPROM.end();
+  return usedSpace;
+}
+
+int calculateFreeSpace() {
+  int usedSpace = calculateUsedSpace();
+  int freeSpace = EEPROM_SIZE - usedSpace;
+  return freeSpace;
+}
+
+
+
+
+
+
+
 //void saveToEEPROMX(unsigned long data, int addr) {
 //None
 //}
@@ -220,9 +664,15 @@ int initialTap = 0;
 int uiY = 0;
 int currentSnapped = 0;
 float snapVel = 0;
+int BPM = 0;
+int checkBPM = 0;
+int lastVal = 0;
+int lastValCheck = 0;
+int lastBeat = 0;
+int beat = 0;
+bool BeatTrig = false;
 
 int lastSpeedCheckTime = 0;
-;
 int lastScrollY = 0;
 
 bool wasAbleToCheck = false;
@@ -231,7 +681,7 @@ bool scrolling = false;
 std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool visible) {
   // Check scroll speed periodically
   // Handle touch events
-  if (tap) {
+  if (sysTap) {
     if (!draggingScrollE && Touch_CTS816.y_point > scrollY - 5 && Touch_CTS816.y_point < scrollY + 65 && Touch_CTS816.x_point > 180) {
       //Serial.println(true);
       initialTap = Touch_CTS816.y_point;
@@ -284,14 +734,14 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
     //scrollV = (scrollY - lastScrollY) / 5;
   }
 
-  scrollY = std::max(5, std::min(175, scrollY));
+  scrollY = std::max(0, std::min(180, scrollY));
   if (oneTickPause == false) {
     Paint_DrawCircle(230 - abs((scrollY - (120 - 29)) / 4) + 1, scrollY + 29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
     //LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);//-abs((scrollY-(120+20))/4)
   }
 
   // Apply scrolling
-  if (draggingScrollE || std::abs(int(scrollV)) > 1 && oneTickPause == false) {
+  if (draggingScrollE || std::abs(int(scrollV)) >= 1 && oneTickPause == false) {
     scrollY += scrollV;
     scrollV *= friction;
     //Paint_DrawCircle(230-abs((scrollY-(120-29))/4)+1, scrollY+29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
@@ -312,7 +762,7 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
   //}
 
   // Determine if scrolling is happening
-  scrolling = draggingScrollE || std::abs(int(scrollV)) > 2;
+  scrolling = draggingScrollE || std::abs(int(scrollV)) > 1;
 
   // Return values
   std::list<int> resultList;
@@ -322,6 +772,183 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
 
   return resultList;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int startTapScroll = 0;
+bool scrollResetOnStop = false;
+
+
+std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible) {
+  // Check scroll speed periodically
+  // Handle touch events
+  if (sysTap) {
+    if (!scrollResetOnStop) {
+      scrollResetOnStop = true;
+      startTapScroll = scrollY;
+    }
+    if (!draggingScrollE) {
+      //Serial.println(true);
+      initialTap = Touch_CTS816.y_point;
+      initialScroll = scrollY;
+      draggingScrollE = true;
+      lastSpeedCheckTime = millis();
+      lastScrollY = scrollY;
+      wasAbleToCheck = false;
+      //scrolling = true;
+    }
+
+    if (draggingScrollE) {
+      otherSwipe = false;
+      watchSwipe = false;
+      miscSwipe = false;
+      //scrolling = true;
+    }
+  } else {
+    if (draggingScrollE) {
+      if (wasAbleToCheck) {
+        scrollV = (scrollY - lastScrollY) / 2.5;  //more percise
+        wasAbleToCheck = false;
+        //Serial.println("Slow");
+      } else {
+        scrollV = (scrollY - initialScroll) / 2;  //likely a quick motion
+        //Serial.println("Quick");
+      }
+      scrollY += scrollV;
+      scrollV *= friction;
+      //Paint_DrawCircle(230 - abs((scrollY - (120 - 29)) / 4) + 1, scrollY + 29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+      ///////////////////////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
+      //Serial.println(scrollY,lastScrollY);
+      if (!sysTap) {
+        draggingScrollE = false;
+      }
+    }
+  }
+
+  if (std::abs(scrollV) < 1) {
+    scrollResetOnStop = false;
+  }
+
+  //auto currentTime = std::chrono::system_clock::now();
+  int currentTime = millis();
+  int elapsedTime = currentTime - lastSpeedCheckTime;
+  if (elapsedTime > 450) {  // 400 is good -- Check speed every 0.3 seconds
+    if (draggingScrollE) {  // && abs(scrollY-lastScrollY)>20
+      //Serial.println("tick");
+      //scrollV = scrollY - lastScrollY;
+      lastScrollY = scrollY;
+      wasAbleToCheck = true;
+    }
+    lastSpeedCheckTime = currentTime;
+  }
+
+  if (draggingScrollE) {
+    scrollY = Touch_CTS816.y_point + (initialScroll - initialTap);  // - scrollV;
+    //scrollV = (scrollY - lastScrollY) / 5;
+  }
+
+  scrollY = std::min(0, scrollY);
+  //if (oneTickPause == false) {
+  //Paint_DrawCircle(230 - abs((scrollY - (120 - 29)) / 4) + 1, scrollY + 29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  //LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);//-abs((scrollY-(120+20))/4)
+  //}
+
+  // Apply scrolling
+  if (draggingScrollE || std::abs(int(scrollV)) >= 1 && oneTickPause == false) {
+    scrollY += scrollV;
+    scrollV *= friction;
+    //Paint_DrawCircle(230-abs((scrollY-(120-29))/4)+1, scrollY+29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+    ////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);  //-abs((scrollY-(120+20))/4)
+  } else {
+    lastScrollY = scrollY;
+  }
+
+  // Clamp scrollY within bounds
+  //scrollY = std::max(5, std::min(175, scrollY));
+  uiY = 240 - scrollY;
+  currentSnapped = scrollY;
+  hoverObject = int(scrollY / (180.0 / numberOfItems));
+
+  // Render headers if required
+  //bool renderHeaders = false; // Modify this condition based on your requirements
+  //if (numberOfItems > 0 && itemHeaders != nullptr && renderHeaders) {
+  //    Paint_DrawString_EN(20, 100, itemHeaders[hoverObject].c_str(), &Font12, YELLOW, RED);
+  //    LCD_1IN28_DisplayWindows(0, 100, 180, 112, BlackImage);
+  //}
+
+  // Determine if scrolling is happening
+  scrolling = (draggingScrollE && std::abs(initialTap - Touch_CTS816.y_point) > 0) || std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 1;  //draggingScrollE ||
+  if (!scrolling) {
+    if (std::abs(scrollV) > 1) {  // || std::abs(initialTap - Touch_CTS816.y_point) > 1
+      scrolling = true;
+    }
+  }
+  Serial.println(scrolling);
+
+  std::list<int> resultList;
+  resultList.push_back(scrollY);
+  resultList.push_back(scrolling ? 1 : 0);
+  resultList.push_back(hoverObject);
+
+  return resultList;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void sendText(const char* text) {  //new
@@ -396,117 +1023,6 @@ void sendText(const char* text) {  //new
   digitalWrite(sendPin, LOW);
 }
 
-
-void sendTextO_L_D(const char* text) {  //1000 delay works well //same with 50
-  vreg_set_voltage(VREG_VOLTAGE_1_30);
-  delay(10);
-  set_sys_clock_khz(400000, true);
-  int lastOne = 0;
-  digitalWrite(D28, HIGH);  //SHOULD BE LOW
-  delay(2);
-  digitalWrite(D27, HIGH);
-  delay(20);               //was 700 //was 210? or 110 WAS 20
-  digitalWrite(D27, LOW);  //SHOULD BE LOW
-  delay(50);               //was2
-  //digitalWrite(D26, LOW); //NO LONGER USED
-  delay(100);
-  for (int bit = 0; bit < 8; bit++) {
-    digitalWrite(D27, (' ' >> bit) & 1);
-    delay(6);  //was 6
-    if (lastOne == 0) {
-      lastOne = 1;
-      digitalWrite(D28, HIGH);
-    } else {
-      lastOne = 0;
-      digitalWrite(D28, LOW);
-    }
-    delay(6);  // Adjust this delay as needed
-  }
-  for (size_t i = 0; text[i] != '\0'; i++) {  //text[i] != '\0';
-    //int lastOne = 0;
-    //digitalWrite(D18, HIGH);
-    for (int bit = 0; bit < 8; bit++) {
-      digitalWrite(D27, (text[i] >> bit) & 1);
-      delay(5);  //was 5
-      if (lastOne == 0) {
-        lastOne = 1;
-        digitalWrite(D28, HIGH);
-      } else {
-        lastOne = 0;
-        digitalWrite(D28, LOW);
-      }
-      delay(7);  // Adjust this delay as needed was 6---7
-    }
-    //digitalWrite(D18, LOW);
-  }
-  delay(20);
-  for (int bit = 0; bit < 8; bit++) {
-    digitalWrite(D27, ('\0' >> bit) & 1);
-    delay(6);  //was 68
-    if (lastOne == 0) {
-      lastOne = 1;
-      digitalWrite(D28, HIGH);
-    } else {
-      lastOne = 0;
-      digitalWrite(D28, LOW);
-    }
-    delay(3);  // Adjust this delay as needed8
-  }
-  delay(20);
-  for (int bit = 0; bit < 8; bit++) {
-    digitalWrite(D27, ('\0' >> bit) & 1);
-    delay(6);  //was 6
-    if (lastOne == 0) {
-      lastOne = 1;
-      digitalWrite(D28, HIGH);
-    } else {
-      lastOne = 0;
-      digitalWrite(D28, LOW);
-    }
-    delay(3);  // Adjust this delay as needed
-  }
-  //delay(50);
-  //digitalWrite(D28, HIGH);
-  delay(50);
-  digitalWrite(D28, LOW);
-
-  if (runningAppName == "home") {
-    set_sys_clock_khz(32000, true);
-    delay(10);
-    vreg_set_voltage(VREG_VOLTAGE_0_90);
-  }
-}
-
-
-
-
-
-//Bluetooth GPIO RECEIVE
-//char receivedText[32] = "";
-int lastState;
-int curState;
-int timeRec = 0;
-char receiveCharO_L_D() {
-  char receivedChar = 0;
-  for (int bit = 0; bit < 8; bit++) {
-    timeRec = millis();
-    while (lastState == curState && millis() - timeRec < 5000) {
-      //Serial.println(lastState);
-      //Serial.println(curState);
-      curState = digitalRead(17);
-      //if(digitalRead(18) == LOW){
-      //  break;
-      //}
-    }
-    //Serial.println("newChar");
-    lastState = curState;
-    receivedChar |= (digitalRead(16) << bit);
-    //delayMicroseconds(60); // Adjust this delay as needed
-  }
-  //Serial.println(receivedChar);
-  return receivedChar;
-}
-
 char* receivedTextMAIN;
 void receiveText() {
   char receivedText[2048] = "";
@@ -553,50 +1069,12 @@ void receiveText() {
   receivedTextMAIN = receivedText;
 }
 
-char receiveChar() {  //new
-  char receivedChar = 0;
-  bool last = LOW;
-  digitalWrite(sendPin, LOW);
-  while (digitalRead(receivePin) == LOW) {}
-  delay(15);
-  for (int i = 0; i < 8; i++) {
-    delay(1);  //100
-    receivedChar |= (digitalRead(receivePin) << i);
-    if (last == HIGH) {
-      digitalWrite(sendPin, LOW);
-      last = LOW;
-    } else {
-      digitalWrite(sendPin, HIGH);
-      last = HIGH;
-    }
-  }
-  Serial.println(receivedChar);
-  return receivedChar;
-}
-
-
-
-
-
 String removeQuotes(String text) {
   if (text.length() >= 2 && text.charAt(0) == '"' && text.charAt(text.length() - 1) == '"') {
     return text.substring(1, text.length() - 1);  // Remove first and last characters
   }
   return text;
 }
-
-std::list<std::string> splitStringA(const std::string& input, char delimiter) {
-  std::list<std::string> resultList;
-  std::istringstream iss(input);
-  std::string token;
-
-  while (std::getline(iss, token, delimiter)) {
-    resultList.push_back(token);
-  }
-
-  return resultList;
-}
-
 
 std::list<std::string> split(const std::string& s, char seperator) {
   std::list<std::string> output;
@@ -623,16 +1101,6 @@ std::list<std::string> newsTitle = {};
 std::string title = "";
 std::string content = "";
 bool timedOut = false;
-
-void awareNess() {
-  vreg_set_voltage(VREG_VOLTAGE_1_30);
-  delay(1);
-  set_sys_clock_khz(400000, true);
-  Paint_DrawRectangle(10, 215, 230, 235, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawString_EN(82, 220, "Check Aware", &Font12, DARKGRAY, YELLOW);  //7
-  LCD_1IN28_DisplayWindows(10, 215, 230, 235, BlackImage);
-}
-
 int checkNotifUpdate = 0;
 
 void checkNotif() {
@@ -701,15 +1169,7 @@ void checkNotif() {
           Serial.println(removeQuotes(JSON.stringify(myObject["app"])).c_str());
 
           notifications.push_back({ phoneNumber, "Messages", content, foundContactName });
-          //Paint_DrawString_EN(100, 100, receivedText, &Font16, BLACK, RED);
-          //Serial.println(receivedText); // Print received NFC data
 
-          //if (runningAppName == "home") {
-          //  Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-          //  Paint_DrawRectangle(120 - ((17 * content.length()) / 2) - 10, 100, ((17 * content.length()) / 2) + 10, 134, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-          //  Paint_DrawString_EN(120 - ((17 * content.length()) / 2), 110, content.c_str(), &Font24, DARKGRAY, WHITE);
-          //  LCD_1IN28_Display(BlackImage);
-          //}
           lastfpstick = millis();
           digitalWrite(D28, HIGH);
           delay(250);
@@ -782,7 +1242,7 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
 
   if (!inTransition && !pauseRender) {
     if (Touch_CTS816.x_point >= x - (height / 2) && Touch_CTS816.x_point <= x + width + (height / 2) && Touch_CTS816.y_point >= y - (height / 2) && Touch_CTS816.y_point <= y + height + (height / 2)) {
-      if (tap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
+      if (sysTap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
         otherSwipe = false;
         watchSwipe = false;
         miscSwipe = true;
@@ -807,6 +1267,114 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
   return specialButtons[{ runningAppName, id, "slider" }];
 }
 
+sFONT* getFont(int height) {
+  if (height >= 24) return &Font24;
+  if (height >= 20) return &Font20;
+  if (height >= 16) return &Font16;
+  if (height >= 12) return &Font12;
+  return &Font8;
+}
+
+int encodeText(const std::string& text) {
+  std::ostringstream encodedStream;
+  encodedStream << "9";
+  for (char c : text) {
+    encodedStream << std::to_string((int)c);
+  }
+  return std::stoi(encodedStream.str());
+}
+
+std::string maskedText(const std::string& text) {
+  std::string masked;
+  for (char c : text) {
+    masked += '*';
+  }
+  return masked;
+}
+
+std::string decodeText(int encodedInt) {
+  std::string encodedText = std::to_string(encodedInt);
+  if (encodedText.empty() || encodedText[0] != '9') return "";
+  std::string decoded;
+  for (size_t i = 1; i < encodedText.size(); i += 2) {
+    int charCode = std::stoi(encodedText.substr(i, 2));
+    decoded += (char)charCode;
+  }
+  return decoded;
+}
+
+std::string tappedIdTextBox = "";
+
+
+std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass) {
+  Serial.println(runningAppName.c_str());
+  if (specialButtons.find({ runningAppName, id, "textBox" }) == specialButtons.end() && specialButtons[{ runningAppName, id, "textBox" }] != 1) {
+    Serial.println("Reset");
+    delay(454);
+    specialButtons[{ runningAppName, id, "textBox" }] = 0;  // Initialize state
+    specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "abc";
+    delay(454);
+  }
+
+  Serial.print("Before change - specialButtonsExtraString: ");
+  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+
+
+  Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  Paint_DrawRectangle(x + 2, y + 2, x + width - 2, y + height - 2, InsideColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+
+  if (tappedIdTextBox == id) {
+    if (!keyboardTyped.empty() || !keyboardData.empty()) {
+      if (!keyboardData.empty()) {
+        keyboardTyped = keyboardData;
+      }
+      Serial.println("SETTTT");
+      if (keyboardTyped != "") {
+        specialButtonsExtraString[{ runningAppName, id, "textBox" }] = keyboardTyped;
+        specialButtons[{ runningAppName, id, "textBox" }] = 1;
+        keyboardData.clear();
+        keyboardTyped.clear();
+        tappedIdTextBox.clear();
+      }
+    }
+  }
+
+  if (!inTransition && !pauseRender) {
+    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + width && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + height) {
+      if (tap && !watchSwipe && !otherSwipe) {
+        otherSwipe = false;
+        watchSwipe = false;
+        miscSwipe = true;
+        inTransition = false;
+        pauseRender = false;
+        scrollV = 0;
+        scrollY = 0;
+
+        if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
+          keyboardTyped = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+        }
+        tappedIdTextBox = id;
+        openApp("keyboard", "DU", 240);
+      }
+    }
+  }
+
+  std::string displayText;
+  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+  if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
+    displayText = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+    if (pass) {
+      displayText = maskedText(displayText);
+    }
+  } else {
+    displayText = defaultText;
+  }
+
+  sFONT* Font = getFont(height);
+  Paint_DrawString_EN(x + 5, y + ((height / 2) - (Font->Height / 2)), displayText.c_str(), Font, InsideColor, OutlineColor);
+
+  return specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+}
 
 bool checkBox(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int size = 30) {
   if (specialButtons.find({ runningAppName, id, "checkBox" }) == specialButtons.end()) {
@@ -1009,8 +1577,8 @@ bool toggle(int x, int y, UWORD OutlineColor, UWORD ToggleColor, std::string id,
 
 //AFTER FIXING BUTTONS AS TODO SAYS, Add "Toggle Buttons" press the button, stays on, deselect, etc
 bool button(int x, int y, const char* text, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background, int size) {  //TODO Make size more variable
-  appSize = 45;                                                                                                       //35 Adjust as needed
-  appLeng = 140;                                                                                                      //140
+  int appSize = 45;                                                                                                   //35 Adjust as needed
+  int appLeng = 140;                                                                                                  //140
 
   if (size == 0) {
     Paint_DrawRectangle(x + 18, y + 0, x + 123, y + 1, Color_Foreground, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -1182,10 +1750,6 @@ void renderSnack() {
   }
 }
 
-void systemTime() {
-  renderSnack();
-}
-
 //Cleaned up some code
 //Notification Pane; changed "No new notifications" to "No notifications"
 //Minor Error Handling and Resetting
@@ -1252,29 +1816,6 @@ std::string internet_get(std::string toilet) {
   return content;
 }
 
-
-void transitionLROLD(std::string app, int begin = 0) {
-  AppPtr func = apps[app];
-  inTransition = true;
-  int transP = begin;
-  Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
-  LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
-  float transV = (1 - ((begin) / 240)) * 25;  //50;//50  ///((begin/240)+1);//25-(25*(begin/240)); //pos
-  while (transP < 246 && abs(transV) > 0.1) {
-    transV = transV / 1.2;  //1.18
-    //Paint_DrawRectangle(0, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    func();
-    //Paint_DrawRectangle(min(max(transP, 0),240), 0, min(transP+6, 240), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    //func();
-    LCD_1IN28_DisplayWindows(max(0, int(transP - (transV * 1.2))), 0, min(transP + 1, 240), 240, BlackImage);
-    transP += transV;
-  }
-  inTransition = false;
-  //func();
-}
-
-
 std::function<void()> funcA;
 void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
   AppPtr func = apps[app];
@@ -1298,7 +1839,7 @@ void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 0;
-  float radVel = 50;
+  float radVel = 60;  //50
   while (radVel > 1 && radius <= 240) {
     radVel = radVel / 1.1;
     radius += radVel;
@@ -1309,25 +1850,6 @@ void transitionLR(std::string app, int begin = 0, bool typeOfApp = false) {
     }
     LCD_1IN28_DisplayWindows(min(240, max(0, radius - 100)), 0, min(240, max(0, radius)), 240, BlackImage);
     //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
-    //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
-  }
-}
-
-void transitionLEER(std::string app, int begin = 0, bool typeOfApp = false) {
-  AppPtr func = apps[app];
-  inTransition = true;
-  int transP = begin;
-  Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
-  LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
-  float radius = 1;
-  float radVel = 20;
-  while (radVel > 1) {
-    radVel = radVel / 1.1;
-    radius += radVel;
-    func();  //new app
-    int newRad = radius / 2;
-    LCD_1IN28_DrawCircle(10, 120, radius, radius, BlackImage);
     //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
   }
 }
@@ -1356,7 +1878,7 @@ void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 240;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius >= 0) {
     radVel = radVel / 1.1;
     radius -= radVel;
@@ -1369,47 +1891,6 @@ void transitionRL(std::string app, int begin = 240, bool typeOfApp = false) {
     //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
     //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
   }
-}
-
-void transitionRLADSIYHKAJSD(std::string app, int begin = 240) {  //bad
-  AppPtr func = apps[app];
-  inTransition = true;
-  int transP = begin;
-  Paint_DrawRectangle(240, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
-  LCD_1IN28_DisplayWindows(begin, 0, 240, 240, BlackImage);
-  float transV = (((begin) / 240)) * 25;  //-50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
-  while (transP > -6 && abs(transV) > 0.1) {
-    transV = transV / 1.2;
-    //Paint_DrawRectangle(240, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    func();
-    //Paint_DrawRectangle(min(max(transP, 0),240), 0, max(0,transP-6), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    //func();
-    LCD_1IN28_DisplayWindows(max(0, transP - 1), 0, min(int(transP + (-transV * 1.2)), 240), 240, BlackImage);
-    transP += transV;
-  }
-  inTransition = false;
-  //func();
-}
-void transitionUDSDFDFD(std::string app, int begin = 0) {
-  AppPtr func = apps[app];
-  inTransition = true;
-  int transP = begin;
-  Paint_DrawRectangle(0, 0, 240, min(max(transP, 0), 240), BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
-  LCD_1IN28_DisplayWindows(0, 0, 240, begin, BlackImage);
-  float transV = (1 - ((begin) / 240)) * 25;  //50;  ///((begin/240)+1);//25-(25*(begin/240)); //pos
-  while (transP < 246 && abs(transV) > 0.1) {
-    transV = transV / 1.2;  //1.08 @ 25
-    //Paint_DrawRectangle(0, 0, 240, min(max(transP, 0),240), BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    func();
-    //Paint_DrawRectangle(0, min(max(transP, 0),240), 240, min(transP+6, 240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    //func();
-    LCD_1IN28_DisplayWindows(0, max(0, int(transP - (transV * 1.2))), 240, min(transP + 1, 240), BlackImage);
-    transP += transV;
-  }
-  inTransition = false;
-  //func();
 }
 
 void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
@@ -1435,7 +1916,7 @@ void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
   //func();
   //LCD_1IN28_DisplayWindows(0, 0, begin, 240, BlackImage);
   float radius = 0;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius <= 240) {
     radVel = radVel / 1.1;
     radius += radVel;
@@ -1448,30 +1929,6 @@ void transitionUD(std::string app, int begin = 0, bool typeOfApp = false) {
     //LCD_1IN28_DrawCircle(60, 120, radius, radius, BlackImage);
     //LCD_1IN28_DisplayCircle(begin,120,radius,BlackImage);
   }
-}
-
-
-
-
-void transitionDUASDASD(std::string app, int begin = 240) {  //bad
-  AppPtr func = apps[app];
-  inTransition = true;
-  int transP = begin;  //240 -
-  Paint_DrawRectangle(0, 0, min(max(transP, 0), 240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  func();
-  LCD_1IN28_DisplayWindows(0, begin, 240, 240, BlackImage);
-  float transV = (((begin) / 240)) * 25;  //-50;  ///(((240-begin)/240)+1);//-(25-(25*((240-begin)/240))); //neg;
-  while (transP > -6 && abs(transV) > 0.1) {
-    transV = transV / 1.2;
-    //Paint_DrawRectangle(0, 0, min(max(transP, 0),240), 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    func();
-    //Paint_DrawRectangle(0, min(max(transP, 0),240), 240, max(0,transP-6), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    //func();
-    LCD_1IN28_DisplayWindows(0, max(0, transP - 1), 240, min(int(transP + (-transV * 1.2)), 240), BlackImage);
-    transP += transV;
-  }
-  inTransition = false;
-  //func();
 }
 
 void transitionDU(std::string app, int begin = 240, bool typeOfApp = false) {
@@ -1496,7 +1953,7 @@ void transitionDU(std::string app, int begin = 240, bool typeOfApp = false) {
   inTransition = true;
 
   float radius = 240;
-  float radVel = 50;
+  float radVel = 60;
   while (radVel > 1 && radius >= 0) {
     radVel = radVel / 1.1;
     radius -= radVel;
@@ -1616,6 +2073,13 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   watchSwipe = false;
   activeDir = "";
 
+
+
+  lastUsedAppName = runningAppName;
+  runningAppName = app;
+
+
+
   speedMode = false;
   idleTime = millis();
 
@@ -1633,31 +2097,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   std::function<void()> appLaunch;     // for v2 apps
   std::function<void()> appSysConfig;  // for v2 apps
 
-  //auto itOld = apps.find(app);
-  //if (itOld != apps.end()) {
-  //  // Call the function pointer
-  //  Serial.println("A");
-  //  AppPtr func = itOld->second;
-  //  Serial.println("FoundApp");
-  //  func();
-  //  Serial.println("AAA");
-  //  return;
-  //}
-
-  //^^ I prob should go through and clean up comments
-
-  /*/ Check if the appName exists in the new standard map
-  auto itNew = appsV2.find(app);
-  if (itNew != appsV2.end()) {
-    // Call the update method on the class instance
-    //AppPtr func = itNew->second->update;
-   // auto lambda = itNew->second->update;
-    // Convert lambda to function pointer and store in AppPtr
-    AppPtr func = toFunctionPointer(&App::update);
-    return;
-  }
-  //*/
   tap = false;
+  sysTap = false;
+  ticksSinceTap = -5;
+  scrolling = true;
   tapHeld = 0;
   flag = 0;
   last = 0;
@@ -1668,13 +2111,6 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   otherSwipe = false;
   watchSwipe = false;
   timeSinceLastButton = millis();
-  //buttonPressCount = 0;
-
-  /*
-  if (runningAppName != "boot") {
-    runningApp();
-  }
-*/
 
   typeOfApp = false;
 
@@ -1684,6 +2120,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
   funcER = apps[app];
   funcER();
+
+  startup = false;
 
   if (typeOfApp == false) {    //v1
     appPermissions = { "*" };  //Unsafe
@@ -1707,12 +2145,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       appLaunch = [instance = itNew->second]() {
         instance->launch();
       };
-      //std::function<void()> func = [instance = itNew->second]() {
-      //  instance->update();
-      //};
 
       appSysConfig();
       if (it == backgroundApps.end()) {
+        /*
         for (auto& [key, value] : specialButtons) {
           std::string appName = key.front();
           std::string buttonGroup = key.back();
@@ -1726,6 +2162,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
             }
           }
         }
+        */
+        Serial.println("hardreset");
+        //specialButtons = {};       //{"APP","ID", "TYPE"}: VALUE
+        //specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
         appLaunch();
       }
     }
@@ -1754,10 +2194,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   } else if (dir == "RAND") {
     transitionRAND(app, typeOfApp);  //transitionDOWNRAND(app);
   }
-  //func();                                                ///////Temp for testing? maybe may stay just needs to run smoother
-  //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);  ////^^
-  //DEV_Delay_ms(1);
-  lastUsedAppName = runningAppName;
+
+  ///////////////////lastUsedAppName = runningAppName;
 
   runningAppV1 = apps[app];  //wait so if I define with a type does it make it "local"?
   if (typeOfApp == true) {
@@ -1769,16 +2207,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     //}
   }
 
-  //itOld = apps.find(app);
-  //if (itOld != apps.end()) {
-  //  // Call the function pointer
-  //  Serial.println("A");
-  //  runningApp = itOld->second;
-  //  Serial.println("FoundApp");
-  //  Serial.println("AAA");
-  //  return;
-  //}
-  runningAppName = app;
+  //////////////////////////////////////////////////runningAppName = app;
   //Serial.println(app.c_str());
   if (std::find(systemApps.begin(), systemApps.end(), app) == systemApps.end()) {
     if (std::find(backgroundApps.begin(), backgroundApps.end(), app) == backgroundApps.end()) {
@@ -1806,18 +2235,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   pauseRender = false;
   otherSwipe = false;
   watchSwipe = false;
-  /////////inTransition = false;
-  ///////pauseRender = false;  //wait huh, Why True? was True, so if something breaks.
-  //Paint_Clear(BLACK);
-  //runningApp();
-  //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
 
   last = 0;
   last2 = 0;
   if (app == "home") {
-    //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
-    //DEV_Delay_ms(1);
-    //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     set_sys_clock_khz(80000, true);
     delay(1);
     vreg_set_voltage(VREG_VOLTAGE_0_90);
@@ -1841,6 +2262,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   //runningApp();////////////////////////////////////////
   //DEV_Delay_ms(1);
 
+  sysTap = false;
+  scrolling = false;
   inTransition = true;
   pauseRender = true;
   resetTransitionAfterTick = true;
@@ -1853,18 +2276,22 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   if (app == "home") {
     DEV_SET_PWM(5);
   } else {
-    DEV_SET_PWM(100);
+    DEV_SET_PWM(displayBright);
   }
 }
 
 bool swipe(std::string dir, int thresh) {
+  int swipeStartThresh = 40;
+  if (dir == "left" || dir == "right") {
+    swipeStartThresh = max(min(thresh - 10, swipeStartThreshMain), 0);
+  }
   bool swipeDone = false;
   if (inTransition == false && miscSwipe == false) {
-    if (tap == false && otherSwipe == true && swipeComplete == "") {
+    if (sysTap == false && otherSwipe == true && swipeComplete == "") {
       activeDir = "";
     }
     if (watchSwipe == false) {
-      if (tap == false) {
+      if (sysTap == false) {
         //activeDir="";
         otherSwipe = false;
       } else {
@@ -1875,22 +2302,10 @@ bool swipe(std::string dir, int thresh) {
             } else {
               swipeComplete = "";
             }
-            if (swipeComplete == "") {
-              /////////////////////////////////////////////////////////////////////////
-              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //TURN OFF CUZ IT CAUSES GLITCHY      LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 10, 240), BlackImage);
-              /////////////////////////////////////////////////////////////////////////
-
-              //            Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //            LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
-            } else {
-              pauseRender = true;
-              Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point + 5, 240), deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);  // + 10
-              LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 5, 240), BlackImage);
-
-
-              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
+            if (swipeComplete != "") {
+              //pauseRender = true;
+              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point + 5, 240), deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);  // + 10
+              //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point - 25), 240, min(Touch_CTS816.y_point + 5, 240), BlackImage);
             }
           }
           if (Touch_CTS816.y_point < swipeStartThresh) {
@@ -1905,24 +2320,14 @@ bool swipe(std::string dir, int thresh) {
               swipeComplete = "";
             }
             if (swipeComplete != "") {
-              //if(tapHeld>5){
-              //  Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, min(Touch_CTS816.y_point+10,240), 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //  LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-20), 240, min(Touch_CTS816.y_point+60,240), BlackImage);
-              //}
-              //} else{
-              //if(tapHeld>10){
-
-              pauseRender = true;
-              Paint_DrawRectangle(0, max(Touch_CTS816.y_point - 5, 0), 240, Touch_CTS816.y_point, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              LCD_1IN28_DisplayWindows(0, max(Touch_CTS816.y_point - 5, 0), 240, min(Touch_CTS816.y_point + 25, 240), BlackImage);
-
-              //Paint_DrawRectangle(0, Touch_CTS816.y_point, 240, max(min(Touch_CTS816.y_point-10,240),0), 0xFE6B, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //LCD_1IN28_DisplayWindows(0, max(0, Touch_CTS816.y_point-10), 240, min(Touch_CTS816.y_point+25,240), BlackImage);
-
-              //}
+              //pauseRender = true;
+              //Paint_DrawRectangle(0, max(Touch_CTS816.y_point - 5, 0), 240, Touch_CTS816.y_point, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //LCD_1IN28_DisplayWindows(0, max(Touch_CTS816.y_point - 5, 0), 240, min(Touch_CTS816.y_point + 25, 240), BlackImage);
             }
           }
-          if (Touch_CTS816.y_point > 110 && Touch_CTS816.y_point < 200 && watchSwipe == false) {
+          //if (Touch_CTS816.y_point > 110 && Touch_CTS816.y_point < 200 && watchSwipe == false) {
+          //watch swipe is retired
+          if (Touch_CTS816.y_point > 240 - swipeStartThresh) {
             otherSwipe = true;
             activeDir = "up";
           }
@@ -1935,15 +2340,10 @@ bool swipe(std::string dir, int thresh) {
             } else {
               swipeComplete = "";
             }
-            if (swipeComplete == "") {
-              /////////////////////////////////////////////////////////////////////////
-              //Paint_DrawRectangle(Touch_CTS816.x_point, 0, min(Touch_CTS816.x_point+10,240), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //TURN OFF CUZ IT CAUSES GLITCHY       LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 10, 240), 240, BlackImage);  //-25, and +10
-              /////////////////////////////////////////////////////////////////////////
-            } else {
-              pauseRender = true;
-              Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point + 5, 240), 0), 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 5, 240), 240, BlackImage);
+            if (swipeComplete != "") {
+              //pauseRender = true;
+              //Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point + 5, 240), 0), 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 25), 0, min(Touch_CTS816.x_point + 5, 240), 240, BlackImage);
             }
           }
           if (Touch_CTS816.x_point < swipeStartThresh) {
@@ -1957,15 +2357,10 @@ bool swipe(std::string dir, int thresh) {
             } else {
               swipeComplete = "";
             }
-            if (swipeComplete == "") {
-              /////////////////////////////////////////////////////////////////////////
-              //Paint_DrawRectangle(Touch_CTS816.x_point, 0, max(min(Touch_CTS816.x_point-10,240),0), 240, 0xF81F, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              //TURN OFF CUZ IT CAUSES GLITCHY STUFF WHEN HOLDING STILL   LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 10), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //should be +25
-              /////////////////////////////////////////////////////////////////////////
-            } else {
-              pauseRender = true;
-              Paint_DrawRectangle(max(min(Touch_CTS816.x_point - 5, 240), 0), 0, Touch_CTS816.x_point, 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-              LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 5), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //and the other - should be -10
+            if (swipeComplete != "") {
+              //pauseRender = true;
+              //Paint_DrawRectangle(max(min(Touch_CTS816.x_point - 5, 240), 0), 0, Touch_CTS816.x_point, 240, deviceSecondColorTheme, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+              //LCD_1IN28_DisplayWindows(max(0, Touch_CTS816.x_point - 5), 0, min(Touch_CTS816.x_point + 25, 240), 240, BlackImage);  //and the other - should be -10
             }
           }
           if (Touch_CTS816.x_point > 240 - swipeStartThresh) {
@@ -1975,7 +2370,8 @@ bool swipe(std::string dir, int thresh) {
         }
       }
       if (swipeComplete == activeDir && activeDir != "") {
-        if (tap == false) {
+        if (sysTap == false) {
+          tapHeld = 0;
           if (dir == "down" && (activeDir == "" || activeDir == dir)) {
             if (Touch_CTS816.y_point > thresh) {
               swipeDone = true;
@@ -2012,21 +2408,19 @@ bool swipe(std::string dir, int thresh) {
               swipeComplete = "";
               activeDir = "";
             }
-          }  // else {
-          //  swipeComplete="";
-          //}
+          }
         }
       }
     }
 
-    if (swipeDone == false && swipeComplete == dir && tap == false) {  //just in case override
+    if (swipeDone == false && swipeComplete == dir && sysTap == false) {  //just in case override
       swipeDone = true;
       swipeComplete = "";
       activeDir = "";
     }
 
     if (otherSwipe && watchSwipe == false && swipeComplete != "") {  //swipeComplete thing new cuz whenever I tap on side it paused .. so yuck
-      pauseRender = true;
+      //pauseRender = true;
     } else {
       pauseRender = false;
     }
@@ -2035,33 +2429,6 @@ bool swipe(std::string dir, int thresh) {
       scrollV = 0;
     }
 
-    //if(swipeDone==false){
-    //  if(tap){
-    //    activeDir=dir;
-    //  }
-    //}
-
-    //if(activeDir!=""){
-    //  inTransition = true;
-    //} else{
-    //  inTransition = false;
-    //}
-
-    /*
-  if (tap == false && otherSwipe == true && swipeComplete == "" && swipeDone == false) {
-    if (swipeComplete == "") {
-      if (activeDir != "up") {
-        if (tapHeld == 0) {
-          Paint_Clear(BLACK);
-        }
-        //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
-      } else if (tapHeld > 8) {
-        Paint_Clear(BLACK);
-        //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
-      }
-    }
-  }
-*/
     if (swipeDone) {
       scrollY = 0;
       scrollV = 0;
@@ -2159,7 +2526,72 @@ int serviceLastRan = 0;
 int homeAppLowPower = 1000;
 int HourMinSize = 4;
 
+//So basically when you press and hold down, Open the Apps Pannel Screen, and make that app so if the previous running app is main, or boot, then display normally, but if it is anything else, show "Select App" at the top, and when an app is tapped set a std::string tappedApp to the app tapped on, instead of opening it.
+//Make default buttons so it only presses AFTER you let go, .. for reasons (So on press set a buttonTrig to true, and if buttonTrig is true, and tap is false, then tap thatt button)
+void leftWidgetApp() {
+  if (appOut != "") {
+    AppPtr toBe = apps[appOut];
+    AppPtr v2 = appV2;
+    if (toBe != v2) {
+      leftWidget = appOut;
+    } else {
+      Serial.println("No v2 apps as widgets");
+    }
+    appOut = "";
+  }
+  AppPtr funcLeft = apps[leftWidget];
+  funcLeft();
+
+  if (inTransition == false) {
+    if (swipe("left", 70)) {
+      openApp("main", "RL", Touch_CTS816.x_point);
+    }
+    if (swipe("right", 70)) {
+      openApp("rightWidget", "LR", Touch_CTS816.x_point);
+    }
+    if (tapHeld == 15 && !otherSwipe && !miscSwipe) {
+      tap = false;
+      appOut = "";
+      openApp("appsPanel", "RAND", 0);
+    }
+  }
+}
+
+void rightWidgetApp() {
+  if (appOut != "") {
+    if (apps[appOut] != appV2) {
+      rightWidget = appOut;
+    } else {
+      Serial.println("No v2 apps as widgets");
+    }
+  }
+  AppPtr funcRight = apps[rightWidget];
+  funcRight();
+
+  if (inTransition == false) {
+    if (swipe("right", 70)) {
+      openApp("main", "LR", Touch_CTS816.x_point);
+    }
+    if (swipe("left", 70)) {
+      openApp("leftWidget", "RL", Touch_CTS816.x_point);
+    }
+    if (tapHeld == 15 && !otherSwipe && !miscSwipe) {
+      tap = false;
+      appOut = "";
+      openApp("appsPanel", "RAND", 0);
+    }
+  }
+}
+
 void homeExec() {
+  AppPtr funcHome = apps["main"];
+  bool inTranTemp = inTransition;
+  inTransition = true;
+  funcHome();
+  inTransition = inTranTemp;
+}
+
+void homeExecOld() {
   //resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
   unsigned long elapsed_time = millis() + CurTime;
   unsigned long hours = (elapsed_time % 86400000) / 3600000;
@@ -2261,7 +2693,7 @@ void homeExec() {
 }
 
 
-void home() {
+void home() {  //https://i.pinimg.com/736x/75/60/81/756081eafa27af63b55aad1eebf10eec.jpg
   float resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
   unsigned long elapsed_time = millis() + CurTime;  // + 46800000 + 2400000
   //unsigned long hours = (elapsed_time % 86400000) / 3600000;
@@ -2276,89 +2708,34 @@ void home() {
     lastfpstick = millis();
   }
 
-  //ALSO DISPLAY BAT PERCENT.
-  if (aod && batSaver == false) {
-    if (elapsed_time - last2 > homeAppLowPower || inTransition) {
-      //uint16_t second_x = 120 - (int)(110 * sin((seconds * 6 + 180) * PI / 180));
-      //uint16_t second_y = 120 + (int)(110 * cos((seconds * 6 + 180) * PI / 180));
-      //Paint_DrawLine(120, 120, (uint16_t)second_x, (uint16_t)second_y, 0x009688, DOT_PIXEL_2X2, LINE_STYLE_SOLID); // Replace 0x4CAF50 with your chosen color
-      //Paint_DrawCircle((uint16_t)second_x, (uint16_t)second_y, 3, 0x009688, DOT_PIXEL_1X1, DRAW_FILL_FULL); // Replace 0x4CAF50 with your chosen color
-      //for power saving reasons, comment out
-
-      //uint16_t minute_x = 120 + (65 * sin(((minutes / 10000)) * PI / 180));
-      //uint16_t minute_y = 120 - (65 * cos(((minutes / 10000)) * PI / 180));
-      //uint16_t minute_x_short = 120 + (90 * sin(((minutes / 10000)) * PI / 180));
-      //uint16_t minute_y_short = 120 - (90 * cos(((minutes / 10000)) * PI / 180));
-
-      //Paint_DrawLine(minute_x_short, minute_y_short, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_4X4, LINE_STYLE_SOLID);  // Replace 0x009688 with your chosen color
-      //Paint_DrawCircle((uint16_t)minute_x, (uint16_t)minute_y, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
-      //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
-      //was 4
-
-      //uint16_t hour_x = 120 + (58 * sin(((hours % 12) * 30 + 0) * PI / 180));
-      //uint16_t hour_y = 120 - (58 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-      //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
-      //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-      //uint16_t hour_x_circle = 120 + (59 * sin(((hours % 12) * 30 + 0) * PI / 180));
-      //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-      /////////Paint_DrawLine(hour_x_cent, hour_y_cent, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_7X7, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
-      //Paint_DrawCircle((uint16_t)hour_x_circle, (uint16_t)hour_y_circle, 6, 0x009688, DOT_PIXEL_6X6, DRAW_FILL_FULL); // Replace 0x00796F with your chosen color
-      ///////////Paint_DrawCircle(120, 120, 8, deviceMainColorTheme, DOT_PIXEL_7X7, DRAW_FILL_FULL);  // Replace 0x00796F with your chosen color
-      //was 8
-
-      homeExec();
-      lastfpstick = millis();
-    }
-    if (resultButINeedPrivates > 2.9) {
-      Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    }
-  }
-
   if (elapsed_time - last > 60000) {
     last = elapsed_time;
     homeAppLowPower = 60000;
     saveToEEPROMX(last, address);
   }
 
-  if (inTransition == false) {
-    if (elapsed_time - last2 > homeAppLowPower) {
+  if (inTransition || (aod && !batSaver)) {
+    if (elapsed_time - last2 > homeAppLowPower || inTransition) {
+      homeExec();
+      lastfpstick = millis();
+
+      if (resultButINeedPrivates > 2.9) {
+        Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+      }
+
       last2 = elapsed_time;
       lastfpstick = millis();
-      LCD_1IN28_Display(BlackImage);
+      if (inTransition == false) {
+        LCD_1IN28_Display(BlackImage);
+      }
       lastfpstick = millis();
-      //LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     }
-
-    //Recommeneded to Open any asked apps After rendering existing scene to prevent double render black bar
-    //if(tap){
-    //if(tapHeld>2){
-    //  homeAppLowPower = 1000;
-    //  openApp(lastUsedAppName, "", 240);
-    //}
   }
 }
 
 void resetFunc() {
   vreg_set_voltage(VREG_VOLTAGE_0_85);
   set_sys_clock_khz(410000, true);
-}
-
-void updateAppNames() {
-  // Clear the existing list
-  appNames.clear();
-
-  // Iterate over the old standard map and add the keys to appNames
-  for (const auto& app : apps) {
-    appNames.push_back(app.first);
-  }
-
-  // Iterate over the new standard map and add the keys to appNames
-  for (const auto& app : appsV2) {
-    appNames.push_back(app.first);
-  }
 }
 
 void errorHandle() {
@@ -2382,17 +2759,11 @@ void errorHandle() {
   }
 }
 
-//#include "App.h"
-
-void myShortcutFunction() {
-  appVersTwo myApp;
-  myApp.update();
-};
 
 void setup() {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
   delay(10);
-  set_sys_clock_khz(300000, true);
+  set_sys_clock_khz(400000, true);  //set_sys_clock_khz(300000, true);
   Serial.begin(9600);
   if (DEV_Module_Init() != 0)
     Serial.println("GPIO Init Fail!");
@@ -2435,6 +2806,8 @@ void setup() {
   apps["keyboard"] = &keyboardR;
   apps["Settings"] = &settings;
   apps["error"] = &errorHandle;
+  apps["leftWidget"] = &leftWidgetApp;
+  apps["rightWidget"] = &rightWidgetApp;
 
   apps["Flappy Bird"] = &flappyBird;
   apps["2048 Puzzle"] = &game;
@@ -2454,6 +2827,9 @@ void setup() {
 
   apps["appVersTwoTestTwo"] = &appV2;
   appsV2["appVersTwoTestTwo"] = new appVersTwoTestTwo();
+
+  apps["devTerm"] = &appV2;
+  appsV2["devTerm"] = new devTerm();
   //updateAppNames();
 
   //BLUETOOTH CRAP
@@ -2469,14 +2845,17 @@ void setup() {
   pinMode(sendPin, OUTPUT);
   pinMode(receivePin, INPUT);
 
-  pinMode(27, OUTPUT);
+  //pinMode(27, OUTPUT);
   pinMode(28, OUTPUT);
+
+  pulseSensor.analogInput(PulseWire);  //27
+  pulseSensor.setThreshold(Threshold);
   //pins 27, and 28 are Data Out, and Clock
 
   int errorCode = readFromEEPROM(2);
   if (errorCode != 2 and errorCode != 3) {
 
-    DEV_SET_PWM(100);
+    DEV_SET_PWM(displayBright);
 
     Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
@@ -2513,7 +2892,7 @@ void setup() {
     float loadV = 15;
     int pos = 0;
 
-    while (counter < 300) {  //was 360
+    while (counter < 200) {  //300 //was 360
       loadV = loadV / 1.015;
       pos += loadV;
       if (loadV < 1.8) {
@@ -2548,9 +2927,9 @@ void setup() {
   //int errorCode = readFromEEPROM(2);
   //if (errorCode != 1) {
   if (errorCode == 2) {
-    error = "TAP thread detected an application was  not responding.";
+    //error = "TAP thread detected an application was  not responding.";
   } else if (errorCode == 3) {
-    error = "BUT thread detected an application was  not responding.";
+    //error = "BUT thread detected an application was  not responding.";
   }
   //} else {
   //  error = "An error occured and the device had to  reset." + std::to_string(errorCode);
@@ -2558,7 +2937,7 @@ void setup() {
   if (error != "") {
     openApp("error", "", 0);
   } else {
-    openApp("home", "RAND");
+    openApp("main", "RAND");  //appsPanel //main
   }
 
   buttonPressCount = 0;
@@ -2566,43 +2945,115 @@ void setup() {
   std::string test = "DevStart";
   message = test.c_str();
   sendText(message);
-
-
-  //const char* message = messag.c_str();
-  //  test = "DevStart";
-  //  message = test.c_str();
-  //  sendText(message);
 }
 
 
 int initalYPos = -1;
+int shouldConsiderUpdating = 0;
+int timeInTrans = 0;
+bool alreadySet = true;
 
+void loop() {  //bare min
+  if (runningAppName == "home") {
+    if (millis() - updateHome > 300000) {
+      updateHome = millis();
+      runningApp();
+    }
+  } else {
+    runningApp();
+  }
+  //checkNotif();  //Check for incoming data
 
+  //Do heart rate stuff, and some little battery saver stuff
 
-#ifdef __arm__
-// should use uinstd.h to define sbrk but Due causes a conflict
-extern "C" char* sbrk(int incr);
-#else   // __ARM__
-extern char* __brkval;
-#endif  // __arm__
+  frameCount++;
+  oneTickPause = false;
+  if (millis() - lastfpstick >= 2000) {
+    lastfpstick = millis();
+    fps = (int)frameCount / 2;
+    frameCount = 0;
 
-int freeMemory() {
-  char top;
-#ifdef __arm__
-  return &top - reinterpret_cast<char*>(sbrk(0));
-#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
-  return &top - __brkval;
-#else   // __arm__
-  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
-#endif  // __arm__
+    if (runningAppName == "home") {  //Lower Clock
+      if (!aod) {
+        DEV_SET_PWM(0);
+      } else {
+        DEV_SET_PWM(20);
+      }
+      set_sys_clock_khz(32000, true);
+      vreg_set_voltage(VREG_VOLTAGE_0_90);
+    } else {  //consider batSaver
+      DEV_SET_PWM(displayBright);
+
+      if (batSaver) {
+        set_sys_clock_khz(132000, true);
+        vreg_set_voltage(VREG_VOLTAGE_0_90);
+      } else {
+        vreg_set_voltage(VREG_VOLTAGE_1_30);
+        set_sys_clock_khz(400000, true);
+      }
+
+      if (millis() - idleTime > autoClock) {
+        //lastUsedAppName = runningAppName;
+        openApp("home", "RAND");
+        idleTime = millis();
+        last2 = 0;
+        last = 0;
+      }
+    }
+  }
+  if (resetTransitionAfterTick) {
+    inTransition = false;
+    pauseRender = false;
+    resetTransitionAfterTick = false;
+
+    appOut = "";  //I think?
+  }
+  if (millis() - serviceLastRan > 1800000) {  //Services
+    serviceLastRan = millis();
+    runNextService();
+  }
+  if (millis() - timeSinceLastButton > 200 && buttonPressCount > 0) {  //Button Press
+    if (buttonPressCount == 1) {
+      if (runningAppName == "main") {
+        openApp("appsPanel", "DU");
+      } else {
+        openApp("main", "RAND");
+      }
+    } else if (buttonPressCount == 2) {
+      openApp("recentApps", "DU");
+    } else if (buttonPressCount >= 3) {
+      if (!backgroundApps.empty()) {
+        openApp(backgroundApps.back(), "RAND");
+      }
+    }
+    buttonPressCount = 0;
+    timeSinceLastButton = millis();
+  }
+
+  tap = false;                        //reset after 1 tick
+  if (ticksSinceTap > 1 && sysTap) {  //Tap Stuff
+    sysTap = false;
+    if (!scrolling && !otherSwipe && !miscSwipe && tapHeld < 10) {
+      if (!scrolling) {
+        tap = true;
+      }
+    }
+    watchSwipe = false;
+    otherSwipe = false;
+    miscSwipe = false;
+    ticksSinceTap = 0;
+    tapHeld = 0;
+    activeDir = "";
+  } else if (sysTap) {
+    tapHeld++;
+    idleTime = millis();
+    ticksSinceTap++;
+  }
 }
 
 
-int shouldConsiderUpdating = 0;
-int timeInTrans = 0;
 
-bool alreadySet = true;
-void loop() {
+void loopOLD() {
   //Touch_INT_callback();
   ///> 3000 ,,,,,,, > 10
   if (millis() - shouldConsiderUpdating > 5000 || (millis() - shouldConsiderUpdating > 50 && (scrolling || tap || otherSwipe || watchSwipe || inTransition || miscSwipe))) {
@@ -2868,16 +3319,72 @@ void loop() {
         vreg_set_voltage(VREG_VOLTAGE_0_90);
       }
     } else if (speedMode && batSaver == false) {
-      DEV_SET_PWM(100);
+      DEV_SET_PWM(displayBright);
       vreg_set_voltage(VREG_VOLTAGE_1_30);
       delay(1);
       set_sys_clock_khz(400000, true);
       dontRunDimAgain = true;
     } else {
-      DEV_SET_PWM(100);
+      DEV_SET_PWM(displayBright);
       dontRunDimAgain = true;
     }
   }
+
+
+  int val = analogRead(PulseWire);
+
+  //int val2 = val / 10;
+  //Serial.println(val);
+
+  /* <<Works SUPER well with finger
+  if (val < 2060 && BeatTrig == false) {//2500
+    beat++;
+    BeatTrig = true;
+    Serial.print("Beat");
+    Serial.println(beat);
+  }
+  if(val > 2100){
+    BeatTrig = false;
+  }
+*/
+  Serial.print("change:");
+  Serial.println((int)min(max(-5, val - lastVal), 50) / 4);
+  if ((int)min(max(-5, val - lastVal), 50) / 4 > 4 && !BeatTrig && millis() - lastBeat > 600) {  //20
+    beat++;
+    BeatTrig = true;
+    lastBeat = millis();
+    Serial.print("Beat:");
+    Serial.println(30);
+  } else if (BeatTrig && (int)min(max(-5, val - lastVal), 50) / 4 < 1) {  //-15
+    BeatTrig = false;
+  } else {
+    Serial.print("Beat:");
+    Serial.println(0);
+  }
+  if (millis() - lastValCheck > 400) {  //150
+    lastValCheck = millis();
+    lastVal = val;
+  }
+  if (millis() - checkBPM > 15000) {
+    checkBPM = millis();
+    BPM = beat * 4;
+    beat = 0;
+  }
+  Serial.print("bpm:");
+  Serial.println(BPM);
+
+
+
+  //if(millis()-checkBPM>10000){
+  if (pulseSensor.sawStartOfBeat()) {
+    checkBPM = millis();
+    BPM = pulseSensor.getBeatsPerMinute();
+    Serial.println(BPM);
+    if (BPM > 200) {
+      BPM = 200;
+    }
+  }
+
 
   if (runningAppName == "home") {
     if (dontRunDimAgain == false) {
@@ -2918,7 +3425,7 @@ void loop() {
         runningApp();
       }
     }
-  } else if (runningAppName == "CountSteps") {
+  } else if (runningAppName == "Step Tracker") {
     autoClock = 3600000;
   } else {
     autoClock = 15000;
@@ -2962,7 +3469,7 @@ void loop() {
 void Touch_INT_callback() {
   if (inTransition == false) {  // && runningAppName!="home"
     CST816S_Get_Point();
-    tap = true;
+    sysTap = true;
     ticksSinceTap = 0;
     flag = 1;
     if (initalYPos == -1) {
@@ -3002,7 +3509,7 @@ void buttonPress() {
         buttonDown = true;
         //buttonPressCount += 1;
         if (runningAppName == "home") {
-          DEV_SET_PWM(100);
+          DEV_SET_PWM(displayBright);
           vreg_set_voltage(VREG_VOLTAGE_1_30);
           delay(1);
           set_sys_clock_khz(400000, true);
@@ -3036,7 +3543,7 @@ void buttonPress() {
               if(runningAppName=="main"){
                   openApp("appsPanel");
               } else if(runningAppName=="home"){
-                  DEV_SET_PWM(100);
+                  DEV_SET_PWM(displayBright);
                   vreg_set_voltage(VREG_VOLTAGE_1_30);
                   set_sys_clock_khz(400000, true);
                   openApp("main");

@@ -9,6 +9,7 @@ extern int tappedNotif;
 extern bool otherSwipe;
 extern bool watchSwipe;
 extern UWORD *BlackImage;
+extern std::string keyboardData;
 extern std::list<std::string> backgroundApps;
 extern std::list<std::list<std::string>> notifications;
 bool swipe(std::string dir, int thresh);

@@ -73,14 +73,6 @@ void news() {
 
   renderSnack();
   if (inTransition == false) {
-    if (lastUsedAppName == "main") {
-      if (swipe("right", 70)) {
-        if (std::find(backgroundApps.begin(), backgroundApps.end(), runningAppName) != backgroundApps.end()) {
-          backgroundApps.remove(runningAppName);
-        }
-        openApp("main", "LR", Touch_CTS816.x_point);
-      }
-    }
     if (pauseRender == false) {
       LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     }
