@@ -14,6 +14,7 @@ extern uint16_t deviceThirdColorTheme;
 extern UWORD *BlackImage;
 extern bool BLEconnected;
 extern std::string weatherTemp;
+extern std::string runningAppName;
 bool swipe(std::string dir, int thresh);
 void saveToEEPROMX(unsigned long data, int addr);
 void openApp(std::string app, std::string dir, int start);
@@ -196,12 +197,12 @@ void mainScreen() {
   //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
 
   int weathLen = weatherTemp.length();
-  Paint_DrawImage1(Sun, 120 - 8, 140, 16, 16, YELLOW);
-  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 156, weatherTemp.c_str(), &Font12, BLACK, GRAY);
+  Paint_DrawImage1(Sun, 120 - 8, 160, 16, 16, YELLOW);
+  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 178, weatherTemp.c_str(), &Font12, BLACK, GRAY);
 
   String dateStr = dayOfWeek + ", " + monthName + " " + day;
   int lengthOfDate = dateStr.length();
-  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 19, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
+  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 60, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
 
 
   Paint_DrawLine(120, 120, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
@@ -233,7 +234,9 @@ void mainScreen() {
   }
 
   //was 8
-  Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  if (runningAppName != "home") {
+    Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  }
 
   //  Paint_DrawString_EN(70, 190, (std::to_string(day)).c_str(), &Font16, BLACK, deviceThirdColorTheme);
 

@@ -201,6 +201,7 @@ uint16_t deviceSecondColorTheme = 0xecfa;  //0xFE6B;
 uint16_t deviceThirdColorTheme = 0xc41a;   //0x06d5;
 bool aod = false;
 bool batSaver = false;
+int displayBright = 25;
 std::string leftWidget = "Weather";
 std::string rightWidget = "News";
 
@@ -791,14 +792,18 @@ std::list<int> scrollFunction(int numberOfItems, std::string itemHeaders[], bool
 
 
 
-
-
+int startTapScroll = 0;
+bool scrollResetOnStop = false;
 
 
 std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible) {
   // Check scroll speed periodically
   // Handle touch events
   if (sysTap) {
+    if (!scrollResetOnStop) {
+      scrollResetOnStop = true;
+      startTapScroll = scrollY;
+    }
     if (!draggingScrollE) {
       //Serial.println(true);
       initialTap = Touch_CTS816.y_point;
@@ -831,8 +836,14 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
       //Paint_DrawCircle(230 - abs((scrollY - (120 - 29)) / 4) + 1, scrollY + 29, 29, deviceMainColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
       ///////////////////////////////////////////////////////////////////////////////////////////LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
       //Serial.println(scrollY,lastScrollY);
-      draggingScrollE = false;
+      if (!sysTap) {
+        draggingScrollE = false;
+      }
     }
+  }
+
+  if (std::abs(scrollV) < 1) {
+    scrollResetOnStop = false;
   }
 
   //auto currentTime = std::chrono::system_clock::now();
@@ -883,9 +894,14 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
   //}
 
   // Determine if scrolling is happening
-  scrolling = (draggingScrollE && std::abs(lastScrollY - scrollY) > 0) || std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 1;  //draggingScrollE ||
+  scrolling = (draggingScrollE && std::abs(initialTap - Touch_CTS816.y_point) > 0) || std::abs(lastScrollY - scrollY) > 1 || std::abs(int(scrollV)) > 1;  //draggingScrollE ||
+  if (!scrolling) {
+    if (std::abs(scrollV) > 1) {  // || std::abs(initialTap - Touch_CTS816.y_point) > 1
+      scrolling = true;
+    }
+  }
+  Serial.println(scrolling);
 
-  // Return values
   std::list<int> resultList;
   resultList.push_back(scrollY);
   resultList.push_back(scrolling ? 1 : 0);
@@ -2083,6 +2099,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
   tap = false;
   sysTap = false;
+  ticksSinceTap = -5;
+  scrolling = true;
   tapHeld = 0;
   flag = 0;
   last = 0;
@@ -2245,6 +2263,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   //DEV_Delay_ms(1);
 
   sysTap = false;
+  scrolling = false;
   inTransition = true;
   pauseRender = true;
   resetTransitionAfterTick = true;
@@ -2257,7 +2276,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   if (app == "home") {
     DEV_SET_PWM(5);
   } else {
-    DEV_SET_PWM(100);
+    DEV_SET_PWM(displayBright);
   }
 }
 
@@ -2511,7 +2530,9 @@ int HourMinSize = 4;
 //Make default buttons so it only presses AFTER you let go, .. for reasons (So on press set a buttonTrig to true, and if buttonTrig is true, and tap is false, then tap thatt button)
 void leftWidgetApp() {
   if (appOut != "") {
-    if (apps[appOut] != appV2) {
+    AppPtr toBe = apps[appOut];
+    AppPtr v2 = appV2;
+    if (toBe != v2) {
       leftWidget = appOut;
     } else {
       Serial.println("No v2 apps as widgets");
@@ -2564,8 +2585,10 @@ void rightWidgetApp() {
 
 void homeExec() {
   AppPtr funcHome = apps["main"];
-  //inTransition = true; //? hm,,
+  bool inTranTemp = inTransition;
+  inTransition = true;
   funcHome();
+  inTransition = inTranTemp;
 }
 
 void homeExecOld() {
@@ -2685,28 +2708,26 @@ void home() {  //https://i.pinimg.com/736x/75/60/81/756081eafa27af63b55aad1eebf1
     lastfpstick = millis();
   }
 
-  //ALSO DISPLAY BAT PERCENT.
-  if (aod && batSaver == false) {
-    if (elapsed_time - last2 > homeAppLowPower || inTransition) {
-      homeExec();
-      lastfpstick = millis();
-    }
-    if (resultButINeedPrivates > 2.9) {
-      Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    }
-  }
-
   if (elapsed_time - last > 60000) {
     last = elapsed_time;
     homeAppLowPower = 60000;
     saveToEEPROMX(last, address);
   }
 
-  if (inTransition == false) {
-    if (elapsed_time - last2 > homeAppLowPower) {
+  if (inTransition || (aod && !batSaver)) {
+    if (elapsed_time - last2 > homeAppLowPower || inTransition) {
+      homeExec();
+      lastfpstick = millis();
+
+      if (resultButINeedPrivates > 2.9) {
+        Paint_DrawCircle(120, 120, 118, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+      }
+
       last2 = elapsed_time;
       lastfpstick = millis();
-      LCD_1IN28_Display(BlackImage);
+      if (inTransition == false) {
+        LCD_1IN28_Display(BlackImage);
+      }
       lastfpstick = millis();
     }
   }
@@ -2834,7 +2855,7 @@ void setup() {
   int errorCode = readFromEEPROM(2);
   if (errorCode != 2 and errorCode != 3) {
 
-    DEV_SET_PWM(100);
+    DEV_SET_PWM(displayBright);
 
     Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
@@ -2871,7 +2892,7 @@ void setup() {
     float loadV = 15;
     int pos = 0;
 
-    while (counter < 5) {  //300 //was 360
+    while (counter < 200) {  //300 //was 360
       loadV = loadV / 1.015;
       pos += loadV;
       if (loadV < 1.8) {
@@ -2961,7 +2982,7 @@ void loop() {  //bare min
       set_sys_clock_khz(32000, true);
       vreg_set_voltage(VREG_VOLTAGE_0_90);
     } else {  //consider batSaver
-      DEV_SET_PWM(100);
+      DEV_SET_PWM(displayBright);
 
       if (batSaver) {
         set_sys_clock_khz(132000, true);
@@ -2975,6 +2996,8 @@ void loop() {  //bare min
         //lastUsedAppName = runningAppName;
         openApp("home", "RAND");
         idleTime = millis();
+        last2 = 0;
+        last = 0;
       }
     }
   }
@@ -3011,7 +3034,9 @@ void loop() {  //bare min
   if (ticksSinceTap > 1 && sysTap) {  //Tap Stuff
     sysTap = false;
     if (!scrolling && !otherSwipe && !miscSwipe && tapHeld < 10) {
-      tap = true;
+      if (!scrolling) {
+        tap = true;
+      }
     }
     watchSwipe = false;
     otherSwipe = false;
@@ -3294,13 +3319,13 @@ void loopOLD() {
         vreg_set_voltage(VREG_VOLTAGE_0_90);
       }
     } else if (speedMode && batSaver == false) {
-      DEV_SET_PWM(100);
+      DEV_SET_PWM(displayBright);
       vreg_set_voltage(VREG_VOLTAGE_1_30);
       delay(1);
       set_sys_clock_khz(400000, true);
       dontRunDimAgain = true;
     } else {
-      DEV_SET_PWM(100);
+      DEV_SET_PWM(displayBright);
       dontRunDimAgain = true;
     }
   }
@@ -3484,7 +3509,7 @@ void buttonPress() {
         buttonDown = true;
         //buttonPressCount += 1;
         if (runningAppName == "home") {
-          DEV_SET_PWM(100);
+          DEV_SET_PWM(displayBright);
           vreg_set_voltage(VREG_VOLTAGE_1_30);
           delay(1);
           set_sys_clock_khz(400000, true);
@@ -3518,7 +3543,7 @@ void buttonPress() {
               if(runningAppName=="main"){
                   openApp("appsPanel");
               } else if(runningAppName=="home"){
-                  DEV_SET_PWM(100);
+                  DEV_SET_PWM(displayBright);
                   vreg_set_voltage(VREG_VOLTAGE_1_30);
                   set_sys_clock_khz(400000, true);
                   openApp("main");
