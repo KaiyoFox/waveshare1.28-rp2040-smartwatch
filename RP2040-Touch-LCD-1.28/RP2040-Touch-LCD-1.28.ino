@@ -2962,15 +2962,15 @@ void loop() {  //bare min
   } else {
     runningApp();
   }
-  //checkNotif();  //Check for incoming data
+  checkNotif();  //Check for incoming data
 
   //Do heart rate stuff, and some little battery saver stuff
 
   frameCount++;
   oneTickPause = false;
-  if (millis() - lastfpstick >= 2000) {
+  if (millis() - lastfpstick >= 3000) {
     lastfpstick = millis();
-    fps = (int)frameCount / 2;
+    fps = (int)frameCount / 3;
     frameCount = 0;
 
     if (runningAppName == "home") {  //Lower Clock

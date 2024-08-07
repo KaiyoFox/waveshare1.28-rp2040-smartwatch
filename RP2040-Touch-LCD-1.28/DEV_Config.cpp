@@ -201,12 +201,15 @@ uint8_t DEV_Module_Init(void) {
   SPI1.setCS(LCD_CS_PIN);
   SPI1.setSCK(LCD_CLK_PIN);
   SPI1.setTX(LCD_MOSI_PIN);
+  //SPI.setClockDivider(64);
   SPI1.begin();
+  SPI1.setClockDivider(2);
   //SPI1.beginTransaction(SPISettings(66500000, MSBFIRST, SPI_MODE0));
-  SPI1.beginTransaction(SPISettings(65000000, MSBFIRST, SPI_MODE3));
+  SPI1.beginTransaction(SPISettings(200000000, MSBFIRST, SPI_MODE0));//SPI_MODE3
+  SPI1.setClockDivider(2);
   //SPI1.beginTransaction(SPISettings(800000000, MSBFIRST, SPI_MODE0));  // Adjusted clock frequency to 80 MHz
 
-
+//doesn't really feel like changing any of these settings does anything :/
   // I2C Config
   Wire1.setSDA(DEV_SDA_PIN);
   Wire1.setSCL(DEV_SCL_PIN);

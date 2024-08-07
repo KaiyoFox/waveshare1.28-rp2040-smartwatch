@@ -555,8 +555,6 @@ void Paint_DrawEdgeEffect() {
 
 
 
-
-
 void Paint_DrawRectangle(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
                          UWORD Color, DOT_PIXEL Line_width, DRAW_FILL Draw_Fill) {
   if (Xstart > Paint.Width || Ystart > Paint.Height || Xend > Paint.Width || Yend > Paint.Height) {
@@ -568,8 +566,8 @@ void Paint_DrawRectangle(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
     UWORD Ypoint;
     //for (Ypoint = Ystart; Ypoint < Yend; Ypoint++) {
     for (UWORD y = Ystart; y <= Yend; y++) {
-      Paint_DrawHorizontalLine(Xstart, Xend, y, Color);
-      //Paint_DrawLine(Xstart, Ypoint, Xend, Ypoint, Color, Line_width, LINE_STYLE_SOLID);
+      //Paint_DrawHorizontalLine(Xstart, Xend, y, Color);
+      Paint_DrawLine(Xstart, y, Xend, y, Color, Line_width, LINE_STYLE_SOLID);
     }
   } else {
     Paint_DrawLine(Xstart, Ystart, Xend, Ystart, Color, Line_width, LINE_STYLE_SOLID);

@@ -2,7 +2,7 @@
 #define flappyBird_H
 extern bool inTransition;
 extern bool pauseRender;
-extern bool tap;
+extern bool sysTap;
 extern bool speedMode;
 extern bool startup;
 extern UWORD *BlackImage;
@@ -48,7 +48,7 @@ void flappyBird() {
     Paint_DrawRectangle(0, 0, 240, 240, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
     LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
   }
-  if (tap) {
+  if (sysTap) {
     if (held == false) {
       held = true;
       vel -= 15;  // Adjust the tap velocity here
@@ -57,8 +57,9 @@ void flappyBird() {
     held = false;
   }
   Paint_DrawRectangle(0, 0, 240, 240, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-  Paint_DrawRectangle(50, birdY, 70, birdY + 20, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+  //Paint_DrawRectangle(50, birdY, 70, birdY + 20, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
+  Paint_DrawRectangle(obstacleX, 0, obstacleX + obstacleWidth + 10, 240, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(obstacleX, 0, obstacleX + obstacleWidth, gapPosition, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawRectangle(obstacleX, gapPosition + gapSize, obstacleX + obstacleWidth, 240, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
   Paint_DrawString_EN(140, 84, (std::to_string(score)).c_str(), &Font16, BLUE, RED);
@@ -69,7 +70,13 @@ void flappyBird() {
       //LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);
       LCD_1IN28_DisplayWindows(max(0, min(240, obstacleX)), 0, max(0, min(240, obstacleX + obstacleWidth + 15)), gapPosition, BlackImage);
       LCD_1IN28_DisplayWindows(max(0, min(240, obstacleX)), gapPosition + gapSize, max(0, min(240, obstacleX + obstacleWidth + 15)), 240, BlackImage);
-      LCD_1IN28_DisplayWindows(50, max(0, birdY - 20), 70, min(240, birdY + 20 + 20), BlackImage);
+
+      Paint_DrawRectangle(50, birdY, 70, birdY + 20, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(obstacleX, 0, obstacleX + obstacleWidth, gapPosition, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(obstacleX, gapPosition + gapSize, obstacleX + obstacleWidth, 240, GREEN, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      //Paint_DrawRectangle(49, obstacleX + obstacleWidth, 71, gapPosition + gapSize, BLUE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      //Paint_DrawRectangle(50, birdY, 70, birdY + 20, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      LCD_1IN28_DisplayWindows(49, max(0, birdY - 20), 71, min(240, birdY + 20 + 20), BlackImage);
     }
 
     vel += gravity;

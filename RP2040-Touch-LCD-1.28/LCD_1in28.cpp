@@ -417,7 +417,7 @@ void LCD_1IN28_Display(UWORD *Image) {
   //for (j = 0; j < LCD_1IN28_HEIGHT; j++) {
   //    DEV_SPI_Write_nByte((uint8_t *)&Image[j*LCD_1IN28_WIDTH], LCD_1IN28_WIDTH*2);
   //}
-  DEV_SPI_Write_nByte((uint8_t *)Image, LCD_1IN28_WIDTH * LCD_1IN28_HEIGHT * 2);
+  SPI1.transfer((uint8_t *)Image, LCD_1IN28_WIDTH * LCD_1IN28_HEIGHT * 2);
 }
 
 void LCD_1IN28_DisplayWindows(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD *Image) {
@@ -429,8 +429,8 @@ void LCD_1IN28_DisplayWindows(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend
   DEV_Digital_Write(LCD_DC_PIN, 1);
   for (j = Ystart; j < Yend; j++) {
     Addr = Xstart + j * LCD_1IN28_WIDTH;
-    //SPI1.transfer((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
-    DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
+    SPI1.transfer((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
+    //DEV_SPI_Write_nByte((uint8_t *)&Image[Addr], (Xend - Xstart) * 2);
   }
 }
 
