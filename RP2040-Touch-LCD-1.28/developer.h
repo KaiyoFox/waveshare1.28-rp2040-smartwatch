@@ -51,7 +51,7 @@ int currentPage = 0;  // Added variable to track the current page
 int numberOfPages = 4;
 
 void developer() {
-  Paint_DrawString_EN(53, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
+  Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE); //53
 
   if (currentPage == 0) {
 
@@ -2770,9 +2770,9 @@ void developer() {
   } else if (currentPage == 3) {
     toggle(50, 10, GRAY, BLUE, "Id", 30);
 
-    radio(50, 20 + 30, GRAY, LIGHTBLUE, "A", 20, "Group1");
-    radio(50, 50 + 30, GRAY, LIGHTBLUE, "B", 20, "Group1");
-    radio(50, 80 + 30, GRAY, LIGHTBLUE, "C", 20, "Group1");
+    radio(50, 20 + 40, GRAY, LIGHTBLUE, "A", 30, "Group1");
+    radio(50, 50 + 40, GRAY, LIGHTBLUE, "B", 30, "Group1");
+    radio(50, 80 + 40, GRAY, LIGHTBLUE, "C", 30, "Group1");
 
 
     if (checkBox(120, 120, LIGHT_GRAY, BLUE, "ID", 30)) {

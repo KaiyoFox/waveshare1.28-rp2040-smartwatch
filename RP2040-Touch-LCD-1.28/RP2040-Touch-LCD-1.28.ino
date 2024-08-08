@@ -900,7 +900,6 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
       scrolling = true;
     }
   }
-  Serial.println(scrolling);
 
   std::list<int> resultList;
   resultList.push_back(scrollY);
@@ -1241,7 +1240,7 @@ int slider(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, 
   }  //Old end X was x+width
 
   if (!inTransition && !pauseRender) {
-    if (Touch_CTS816.x_point >= x - (height / 2) && Touch_CTS816.x_point <= x + width + (height / 2) && Touch_CTS816.y_point >= y - (height / 2) && Touch_CTS816.y_point <= y + height + (height / 2)) {
+    if (Touch_CTS816.x_point >= x - (height / 1.5) && Touch_CTS816.x_point <= x + width + (height / 1.5) && Touch_CTS816.y_point >= y - (height * 1.5) && Touch_CTS816.y_point <= y + height + (height * 1.5)) {
       if (sysTap && !watchSwipe && !otherSwipe && !inTransition && !pauseRender) {
         otherSwipe = false;
         watchSwipe = false;
@@ -1307,17 +1306,17 @@ std::string tappedIdTextBox = "";
 
 
 std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::string id, int width, int height, std::string defaultText, bool pass) {
-  Serial.println(runningAppName.c_str());
+  //Serial.println(runningAppName.c_str());
   if (specialButtons.find({ runningAppName, id, "textBox" }) == specialButtons.end() && specialButtons[{ runningAppName, id, "textBox" }] != 1) {
-    Serial.println("Reset");
-    delay(454);
+    //Serial.println("Reset");
+    //delay(454);
     specialButtons[{ runningAppName, id, "textBox" }] = 0;  // Initialize state
-    specialButtonsExtraString[{ runningAppName, id, "textBox" }] = "abc";
-    delay(454);
+    specialButtonsExtraString[{ runningAppName, id, "textBox" }] = defaultText;
+    //delay(454);
   }
 
-  Serial.print("Before change - specialButtonsExtraString: ");
-  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+  //Serial.print("Before change - specialButtonsExtraString: ");
+  //Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
 
 
   Paint_DrawRectangle(x, y, x + width, y + height, OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);
@@ -1328,7 +1327,7 @@ std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::st
       if (!keyboardData.empty()) {
         keyboardTyped = keyboardData;
       }
-      Serial.println("SETTTT");
+      //Serial.println("SETTTT");
       if (keyboardTyped != "") {
         specialButtonsExtraString[{ runningAppName, id, "textBox" }] = keyboardTyped;
         specialButtons[{ runningAppName, id, "textBox" }] = 1;
@@ -1360,7 +1359,7 @@ std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::st
   }
 
   std::string displayText;
-  Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
+  //Serial.println(specialButtonsExtraString[{ runningAppName, id, "textBox" }].c_str());
   if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
     displayText = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
     if (pass) {
@@ -1450,13 +1449,13 @@ bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int s
 
   if (specialButtons[{ runningAppName, id, "radio" + group }] == 1) {  //Make Circle, in circle, if selected, if not, Only Outline Circle
     Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), XColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 4.5), XColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 4), XColor, DOT_PIXEL_2X2, DRAW_FILL_FULL); //was / 4.5
   } else {
     Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
   }
 
   if (!inTransition && !pauseRender) {
-    if (Touch_CTS816.x_point >= x && Touch_CTS816.x_point <= x + size && Touch_CTS816.y_point >= y && Touch_CTS816.y_point <= y + size) {
+    if (Touch_CTS816.x_point >= x - (size/2) && Touch_CTS816.x_point <= x + (size/2) && Touch_CTS816.y_point >= y - (size/2) && Touch_CTS816.y_point <= y + (size/2)) {
       if (tap && !watchSwipe && !otherSwipe && !miscSwipe && !inTransition && !pauseRender) {
         if (tapHeld <= 1) {
           tap = false;
@@ -2060,12 +2059,14 @@ void transitionDOWNRAND(std::string app, bool typeOfApp = false) {  //good?
   //func();
 }
 
+bool openingApp = false;
 AppPtr funcER;
 void openApp(std::string app, std::string dir = "", int start = -1) {
   vreg_set_voltage(VREG_VOLTAGE_1_30);
   delay(5);
   set_sys_clock_khz(400000, true);
 
+  openingApp = true;
   otherSwipe = false;
   watchSwipe = false;
   miscSwipe = false;
@@ -2147,8 +2148,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       };
 
       appSysConfig();
-      if (it == backgroundApps.end()) {
-        /*
+      if (it == backgroundApps.end()) { //basically this means the app does not exist
+        
         for (auto& [key, value] : specialButtons) {
           std::string appName = key.front();
           std::string buttonGroup = key.back();
@@ -2157,12 +2158,11 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
 
           if (appName == app) {
             specialButtons[{ app, butId, buttonGroup }] = 0;
-            if (buttonGroup == "toggle") {
-              specialButtonsExtra[{ app, butId, "toggle" }] = { 0, 0 };
-            }
+            specialButtonsExtra[{ app, butId, buttonGroup }] = { 0, 0 };
+            specialButtonsExtraString[{ app, butId, buttonGroup }] = "";
           }
         }
-        */
+        
         Serial.println("hardreset");
         //specialButtons = {};       //{"APP","ID", "TYPE"}: VALUE
         //specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
@@ -2278,6 +2278,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   } else {
     DEV_SET_PWM(displayBright);
   }
+  openingApp = false;
 }
 
 bool swipe(std::string dir, int thresh) {
@@ -2772,14 +2773,15 @@ void setup() {
   LCD_1IN28_Init(HORIZONTAL);
   LCD_1IN28_Clear(BLACK);
   DEV_SET_PWM(0);
-  UDOUBLE Imagesize = LCD_1IN28_HEIGHT * LCD_1IN28_WIDTH * 2;
+  UDOUBLE Imagesize = LCD_1IN28_HEIGHT * LCD_1IN28_WIDTH * 2;//2
   //UWORD *BlackImage;
   if ((BlackImage = (UWORD*)malloc(Imagesize)) == NULL) {
     Serial.println("Failed to apply for black memory...");
     exit(0);
   }
-  Paint_NewImage((UBYTE*)BlackImage, LCD_1IN28.HEIGHT, LCD_1IN28.WIDTH, 0, WHITE);
-  Paint_SetScale(65);
+  Paint_NewImage((UBYTE*)BlackImage, 240, 240, 0, WHITE);
+   //240 past stopped workin? nope 16 scale @ 480x480 works, almost good, going up to 600 does bad, going down to 400 does bad, 500 has goofy shifts
+  Paint_SetScale(65);//65 Paint_SetPixel (16 needs 960x960,, but... ram issue)
   Paint_SetRotate(ROTATE_0);
   Paint_Clear(WHITE);
   LCD_1IN28_Display(BlackImage);
@@ -3477,9 +3479,12 @@ void Touch_INT_callback() {
     }
   }
 
-  if (runningAppName == "home") {
+  if (runningAppName == "home" && !openingApp) {
     homeAppLowPower = 1000;
-    //openApp(lastUsedAppName, "", 240);
+    DEV_SET_PWM(displayBright);
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
+    delay(1);
+    set_sys_clock_khz(400000, true);
     openApp("main", "RAND", 0);
     updateHome = 0;
   }
@@ -3508,7 +3513,7 @@ void buttonPress() {
       if (buttonDown == false) {
         buttonDown = true;
         //buttonPressCount += 1;
-        if (runningAppName == "home") {
+        if (runningAppName == "home" && !openingApp) {
           DEV_SET_PWM(displayBright);
           vreg_set_voltage(VREG_VOLTAGE_1_30);
           delay(1);
