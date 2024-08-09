@@ -161,6 +161,8 @@ void Paint_DrawCircle(UWORD X_Center, UWORD Y_Center, UWORD Radius, UWORD Color,
 void Paint_DrawCircleTrans(UWORD Xcenter, UWORD Ycenter, UWORD Radius, uint8_t transparency, DOT_PIXEL Line_width, DRAW_FILL Draw_Fill);
 void Paint_DrawEdgeEffect();
 void Paint_DrawRectangleTrans(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, uint8_t transparency, DOT_PIXEL Line_width, DRAW_FILL Draw_Fill);
+void Paint_SetRow(UWORD Xpoint, UWORD Ypoint, UWORD Color, int Xend); //godness of all rendering speeds
+void Paint_SetArea(UWORD Xpoint, UWORD Ypoint, UWORD Color, UWORD Xend, UWORD Yend); //Even more godness, technically 1 clock cycle or a few faster than rectangle, because rectangle just calls this function anyway
 
 //Display string
 void Paint_DrawChar(UWORD Xstart, UWORD Ystart, const char Acsii_Char, sFONT* Font, UWORD Color_Foreground, UWORD Color_Background);

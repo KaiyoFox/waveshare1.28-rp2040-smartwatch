@@ -2956,6 +2956,7 @@ int timeInTrans = 0;
 bool alreadySet = true;
 
 void loop() {  //bare min
+Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
   if (runningAppName == "home") {
     if (millis() - updateHome > 300000) {
       updateHome = millis();
@@ -2965,6 +2966,9 @@ void loop() {  //bare min
     runningApp();
   }
   checkNotif();  //Check for incoming data
+
+  Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE); //53
+  LCD_1IN28_DisplayWindows(70, 19, 100, 31, BlackImage);
 
   //Do heart rate stuff, and some little battery saver stuff
 
