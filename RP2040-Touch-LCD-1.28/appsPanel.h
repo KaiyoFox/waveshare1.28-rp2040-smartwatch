@@ -136,7 +136,7 @@ void appsPanel() {
     }
   }
 
-  renderSnack();
+  //renderSnack();
   if (inTransition == false) {
     if (pauseRender == false && openingAnApp == false) {
       LCD_1IN28_DisplayWindows(startX - 2, 0, startX+appLeng+4, 240, BlackImage);

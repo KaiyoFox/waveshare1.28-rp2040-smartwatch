@@ -1,3 +1,4 @@
+#include <string>
 #ifndef notifPane_H
 #define notifPane_H
 extern bool inTransition;
@@ -26,9 +27,9 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
 float result;
 int tappedNotif = -1;
 std::list<std::list<std::string>> notifications = {
-    {"Title", "App", "Content", "AppSpecificData"},
-    {"Contact1", "Messages", "SomeContent", "Number"},
-    {"Contact2", "Messages", "CONTENT2", "Number"},
+  { "Title", "App", "Content", "AppSpecificData", std::to_string(millis()) },  //(Thee last value is the Time Stamp)
+  { "Contact1", "Messages", "SomeContent", "Number", std::to_string(millis()) },
+  { "Contact2", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
 };
 std::list<std::list<std::string>> uniqueNotifications;
 std::set<std::string> uniqueTitles;
@@ -36,94 +37,122 @@ std::set<std::string> uniqueTitles;
 extern int scrollY;
 extern int hoverObject;
 
+std::string calculateTimeAgo(const std::string &timestampStr) {
+  // Convert timestamp from string to integer milliseconds
+  long long timestamp = std::stoll(timestampStr);
+
+  // Get current time in milliseconds
+  auto now = std::chrono::system_clock::now();
+  auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+  long long now_time = now_ms.time_since_epoch().count();
+
+  // Calculate time difference
+  long long diff = now_time - timestamp;
+
+  // Convert milliseconds to minutes, hours, days
+  const long long milliseconds_in_minute = 60 * 1000;
+  const long long milliseconds_in_hour = 60 * milliseconds_in_minute;
+  const long long milliseconds_in_day = 24 * milliseconds_in_hour;
+
+  if (diff < milliseconds_in_minute) {
+    return std::to_string(diff / 1000) + "s ago";  // Seconds
+  } else if (diff < milliseconds_in_hour) {
+    return std::to_string(diff / milliseconds_in_minute) + "min ago";  // Minutes
+  } else if (diff < milliseconds_in_day) {
+    return std::to_string(diff / milliseconds_in_hour) + "h ago";  // Hours
+  } else {
+    return std::to_string(diff / milliseconds_in_day) + "d ago";  // Days
+  }
+}
+
 void notifPane() {
-    if (startup) {
-        startup = false;
-        scrollY = 0;
-        LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
+  if (startup) {
+    startup = false;
+    scrollY = 0;
+    LCD_1IN28_DisplayWindows(180, 0, 240, 240, BlackImage);
+  }
+
+  result = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
+  float adjustedResult = std::min(result, 3.11f);
+
+  int notifX = 20;
+  int notifY = 180;      // Start from bottom and move up
+  int notifHeight = 50;  // Adjusted for larger content area
+  int spacing = 10;
+  int index = 0;
+
+  uniqueNotifications.clear();
+  uniqueTitles.clear();
+  for (const auto &notification : notifications) {
+    auto title = notification.front();
+    if (uniqueTitles.find(title) == uniqueTitles.end()) {
+      uniqueTitles.insert(title);
+      uniqueNotifications.push_back(notification);
     }
+  }
 
-    result = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
-    float adjustedResult = std::min(result, 3.11f);
+  int number = uniqueNotifications.size();
+  scrollFunctionFull(number, {}, true);
 
-    float notifX = 20;
-    float notifY = 50;
-    float notifHeight = 35;
-    float index = 0;
+  for (const auto &notification : uniqueNotifications) {
+    int adjustedY = notifY - (index * (notifHeight + spacing)) + scrollY;
 
-    uniqueNotifications.clear();
-    uniqueTitles.clear();
-    for (const auto &notification : notifications) {
-        auto title = notification.front();
-        if (uniqueTitles.find(title) == uniqueTitles.end()) {
-            uniqueTitles.insert(title);
-            uniqueNotifications.push_back(notification);
+    if (!oneTickPause && adjustedY > 0 && adjustedY < 240 - notifHeight) {
+      // Drawing the rounded rectangle (reusing from appsPanel)
+      Paint_DrawRectangle(notifX, adjustedY, notifX + 220, adjustedY + notifHeight, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+      // Draw the app icon placeholder (red rectangle)
+      Paint_DrawRectangle(notifX - 25, adjustedY - 25, notifX + 25, adjustedY + 25, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+      // Draw the app name on the top left
+      Paint_DrawString_EN(notifX + 30, adjustedY + 5, (*std::next(notification.begin(), 1)).c_str(), &Font16, DARKGRAY, WHITE);
+
+      // Draw the message title below the app name
+      Paint_DrawString_EN(notifX + 30, adjustedY + 20, (*std::next(notification.begin(), 0)).c_str(), &Font20, DARKGRAY, WHITE);
+
+      // Draw the timestamp on the top right
+      std::string timeAgo = calculateTimeAgo(*std::prev(notification.end()));  // You’ll need to implement this function
+      Paint_DrawString_EN(notifX + 150, adjustedY + 5, timeAgo.c_str(), &Font12, DARKGRAY, WHITE);
+
+      if (tap && !watchSwipe && !otherSwipe && runningAppName == "notifPane") {
+        if (Touch_CTS816.x_point >= notifX && Touch_CTS816.x_point <= notifX + 220 && Touch_CTS816.y_point >= adjustedY && Touch_CTS816.y_point <= adjustedY + notifHeight) {
+          tappedNotif = index;
+          oneTickPause = true;
+          notifHeight = -45;
+          auto it = apps.find(*std::next(notification.begin(), 1));  // Open the app associated with the notification
+          if (it != apps.end()) {
+            openApp(it->first, "RL", 240);
+          } else {
+            openApp("previewNotif", "RL", 240);
+          }
         }
+      }
     }
+    index++;
+  }
 
-    int number = uniqueNotifications.size();
-    scrollFunctionFull(number, {}, true);
+  // Draw the "Clear All" button at the top after scrolling up
+  if (true) {  //if viisable
+    Paint_DrawRectangle(83, scrollY + 10, 156, scrollY + 42, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawString_EN(90, scrollY + 19, "Clear All", &Font16, GRAY, RED);
 
-    for (const auto &notification : uniqueNotifications) {
-        int adjustedY = notifY + (index * (notifHeight + 10)) - (-scrollY / (240 / ((notifHeight + 10) * number)));
-        if (!oneTickPause && adjustedY > 0 && adjustedY < 180 - notifHeight) {
-            Paint_DrawRectangle(notifX, std::max(0, std::min(180 - (int)notifHeight, adjustedY)), 
-                                (240 - notifX) - 50, std::max(0, std::min(180 - (int)notifHeight, adjustedY + (int)notifHeight)), 
-                                0x2121, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-            auto lastItem = std::prev(notification.end());
-            std::string openAppWith = *std::next(notification.begin(), 1);
-
-            Paint_DrawString_EN(notifX + 5, (adjustedY + notifHeight / 2) - 6, lastItem->c_str(), &Font16, 0x2121, WHITE);
-
-            if (tap && !watchSwipe && !otherSwipe && runningAppName == "notifPane") {
-                if (Touch_CTS816.x_point >= notifX && Touch_CTS816.x_point <= 156 &&
-                    Touch_CTS816.y_point >= adjustedY && Touch_CTS816.y_point <= adjustedY + notifHeight) {
-                    tappedNotif = index;
-                    oneTickPause = true;
-                    notifHeight = -45;
-                    auto it = apps.find(openAppWith);
-                    if (it != apps.end()) {
-                        openApp(openAppWith, "RL", 240);
-                    } else {
-                        openApp("previewNotif", "RL", 240);
-                    }
-                }
-            }
-        }
-        index++;
+    if (tap && !watchSwipe && !otherSwipe) {
+      if (Touch_CTS816.x_point >= 83 && Touch_CTS816.x_point <= 156 && Touch_CTS816.y_point >= scrollY + 10 && Touch_CTS816.y_point <= scrollY + 42) {
+        notifications.clear();
+        uniqueNotifications.clear();
+        uniqueTitles.clear();
+        openApp("main", "UD", 0);
+      }
     }
+  }
 
-    if (notifications.empty()) {
-        Paint_DrawString_EN(notifX + 5, (notifY + notifHeight / 2) - 6, "No notifications", &Font16, BLACK, WHITE);
+  renderSnack();
+  if (!inTransition) {
+    if (swipe("up", 190)) {
+      openApp("main", "DU", Touch_CTS816.y_point);
     }
-
-    if (!oneTickPause) {
-        Paint_DrawImage1(Bat816, 135, 20, 16, 8, GREEN);
-        Paint_DrawString_EN(153, 19, (std::to_string(std::min(int(((adjustedResult - 2.29) / (2.4 - 2.25)) * 100), 100)) + "%").c_str(), &Font12, BLACK, GREEN);
+    if (!pauseRender && !oneTickPause) {
+      LCD_1IN28_DisplayWindows(notifX - 1, 0, 240, 240, BlackImage);
     }
-
-    if (notifHeight != -45) {
-        Paint_DrawRectangle(83, 190, 156, 222, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-        Paint_DrawString_EN(90, 199, "Clear", &Font16, GRAY, RED);
-
-        renderSnack();
-        if (!inTransition) {
-            if (swipe("up", 190)) {
-                openApp("main", "DU", Touch_CTS816.y_point);
-            }
-            if (!pauseRender && !oneTickPause) {
-                LCD_1IN28_DisplayWindows(notifX - 1, 0, 240, 240, BlackImage);
-            }
-
-            if (tap && !watchSwipe && !otherSwipe) {
-                if (Touch_CTS816.x_point >= 83 && Touch_CTS816.x_point <= 156 &&
-                    Touch_CTS816.y_point >= 190 && Touch_CTS816.y_point <= 222) {
-                    notifications.clear();
-                    uniqueNotifications.clear();
-                    uniqueTitles.clear();
-                    openApp("main", "UD", 0);
-                }
-            }
-        }
-    }
+  }
 }

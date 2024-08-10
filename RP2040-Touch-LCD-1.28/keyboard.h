@@ -11,6 +11,7 @@ extern std::list<std::string> backgroundApps;
 extern std::string keyboardData;   //Occurs when Enter Pressed
 extern std::string keyboardTyped;  //Just in case apps what access to curretnly typed
 extern std::string lastUsedAppName;
+extern std::string appIn;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
 //void sendText(const char* text);
@@ -124,11 +125,12 @@ std::string lastAppOnClose = "";
 void keyboardR() {
   if (startup) {
     startup = false;
-    if (lastAppOnClose != lastUsedAppName) {
+    if (lastAppOnClose != lastUsedAppName && appIn!="customText") {
       lastAppOnClose = lastUsedAppName;
       keyboardTyped = "";
       Serial.println("RES");
     }
+    appIn = "";
     keyboardData = "";
     //pinMode(D27, OUTPUT);  //16
     //pinMode(D28, OUTPUT);  //18 CLOCK!!

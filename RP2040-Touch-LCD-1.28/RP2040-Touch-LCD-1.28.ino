@@ -800,26 +800,28 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
   // Check scroll speed periodically
   // Handle touch events
   if (sysTap) {
-    if (!scrollResetOnStop) {
-      scrollResetOnStop = true;
-      startTapScroll = scrollY;
-    }
-    if (!draggingScrollE) {
-      //Serial.println(true);
-      initialTap = Touch_CTS816.y_point;
-      initialScroll = scrollY;
-      draggingScrollE = true;
-      lastSpeedCheckTime = millis();
-      lastScrollY = scrollY;
-      wasAbleToCheck = false;
-      //scrolling = true;
-    }
+    if (activeDir != "up" && activeDir != "down" && !otherSwipe) {
+      if (!scrollResetOnStop) {
+        scrollResetOnStop = true;
+        startTapScroll = scrollY;
+      }
+      if (!draggingScrollE) {
+        //Serial.println(true);
+        initialTap = Touch_CTS816.y_point;
+        initialScroll = scrollY;
+        draggingScrollE = true;
+        lastSpeedCheckTime = millis();
+        lastScrollY = scrollY;
+        wasAbleToCheck = false;
+        //scrolling = true;
+      }
 
-    if (draggingScrollE) {
-      otherSwipe = false;
-      watchSwipe = false;
-      miscSwipe = false;
-      //scrolling = true;
+      if (draggingScrollE) {
+        //otherSwipe = false;
+        watchSwipe = false;
+        miscSwipe = false;
+        //scrolling = true;
+      }
     }
   } else {
     if (draggingScrollE) {
@@ -840,6 +842,10 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
         draggingScrollE = false;
       }
     }
+  }
+
+  if(otherSwipe || activeDir == "up" || activeDir == "down"){
+    draggingScrollE = false;
   }
 
   if (std::abs(scrollV) < 1) {
@@ -1351,7 +1357,10 @@ std::string textBox(int x, int y, UWORD OutlineColor, UWORD InsideColor, std::st
 
         if (!specialButtonsExtraString[{ runningAppName, id, "textBox" }].empty()) {
           keyboardTyped = specialButtonsExtraString[{ runningAppName, id, "textBox" }];
+        } else {
+          keyboardTyped = defaultText;
         }
+        appIn = "customText";
         tappedIdTextBox = id;
         openApp("keyboard", "DU", 240);
       }
@@ -1449,13 +1458,13 @@ bool radio(int x, int y, UWORD OutlineColor, UWORD XColor, std::string id, int s
 
   if (specialButtons[{ runningAppName, id, "radio" + group }] == 1) {  //Make Circle, in circle, if selected, if not, Only Outline Circle
     Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), XColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 4), XColor, DOT_PIXEL_2X2, DRAW_FILL_FULL); //was / 4.5
+    Paint_DrawCircle(x + (size / 2) - 1, y + (size / 2) - 1, (size / 4), XColor, DOT_PIXEL_2X2, DRAW_FILL_FULL);  //was / 4.5
   } else {
     Paint_DrawCircle(x + (size / 2), y + (size / 2), (size / 2), OutlineColor, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
   }
 
   if (!inTransition && !pauseRender) {
-    if (Touch_CTS816.x_point >= x - (size/2) && Touch_CTS816.x_point <= x + (size/2) && Touch_CTS816.y_point >= y - (size/2) && Touch_CTS816.y_point <= y + (size/2)) {
+    if (Touch_CTS816.x_point >= x - (size / 1.5) && Touch_CTS816.x_point <= x + (size / 1.5) && Touch_CTS816.y_point >= y - (size / 1.5) && Touch_CTS816.y_point <= y + (size / 1.5)) {
       if (tap && !watchSwipe && !otherSwipe && !miscSwipe && !inTransition && !pauseRender) {
         if (tapHeld <= 1) {
           tap = false;
@@ -2148,8 +2157,8 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       };
 
       appSysConfig();
-      if (it == backgroundApps.end()) { //basically this means the app does not exist
-        
+      if (it == backgroundApps.end()) {  //basically this means the app does not exist
+
         for (auto& [key, value] : specialButtons) {
           std::string appName = key.front();
           std::string buttonGroup = key.back();
@@ -2162,7 +2171,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
             specialButtonsExtraString[{ app, butId, buttonGroup }] = "";
           }
         }
-        
+
         Serial.println("hardreset");
         //specialButtons = {};       //{"APP","ID", "TYPE"}: VALUE
         //specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
@@ -2250,9 +2259,9 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
       //set_sys_clock_khz(32000, true);
       //vreg_set_voltage(VREG_VOLTAGE_0_90);
 
-      vreg_set_voltage(VREG_VOLTAGE_1_30);
-      delay(1);
-      set_sys_clock_khz(150000, true);  //120000
+      //vreg_set_voltage(VREG_VOLTAGE_1_30); //////////////////////RETIRED UNTIL DYNAMIC CLOCK RETURNS
+      //delay(1);
+      //set_sys_clock_khz(150000, true);  //120000
     } else {
       vreg_set_voltage(VREG_VOLTAGE_1_30);
       delay(1);
@@ -2279,10 +2288,11 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
     DEV_SET_PWM(displayBright);
   }
   openingApp = false;
+  Serial.println("App Open");
 }
 
 bool swipe(std::string dir, int thresh) {
-  int swipeStartThresh = 40;
+  int swipeStartThresh = 30;
   if (dir == "left" || dir == "right") {
     swipeStartThresh = max(min(thresh - 10, swipeStartThreshMain), 0);
   }
@@ -2297,11 +2307,13 @@ bool swipe(std::string dir, int thresh) {
         otherSwipe = false;
       } else {
         if (dir == "down" && (activeDir == "" || activeDir == dir)) {
-          if (otherSwipe) {
+          if (activeDir == "down") {
             if (Touch_CTS816.y_point > thresh) {
               swipeComplete = dir;
+              otherSwipe = true;
             } else {
               swipeComplete = "";
+              otherSwipe = false;
             }
             if (swipeComplete != "") {
               //pauseRender = true;
@@ -2310,15 +2322,17 @@ bool swipe(std::string dir, int thresh) {
             }
           }
           if (Touch_CTS816.y_point < swipeStartThresh) {
-            otherSwipe = true;
+            //otherSwipe = true;
             activeDir = "down";
           }
         } else if (dir == "up" && (activeDir == "" || activeDir == dir)) {
-          if (otherSwipe) {
+          if (activeDir == "up") {
             if (Touch_CTS816.y_point < 240 - thresh) {
               swipeComplete = dir;
+              otherSwipe = true;
             } else {
               swipeComplete = "";
+              otherSwipe = false;
             }
             if (swipeComplete != "") {
               //pauseRender = true;
@@ -2329,17 +2343,19 @@ bool swipe(std::string dir, int thresh) {
           //if (Touch_CTS816.y_point > 110 && Touch_CTS816.y_point < 200 && watchSwipe == false) {
           //watch swipe is retired
           if (Touch_CTS816.y_point > 240 - swipeStartThresh) {
-            otherSwipe = true;
+            //otherSwipe = true;
             activeDir = "up";
           }
         } else if (dir == "right" && (activeDir == "" || activeDir == dir)) {
           //Serial.println("Raw");
-          if (otherSwipe) {
+          if (activeDir == "right") {
             //Serial.println("AA");
             if (Touch_CTS816.x_point > thresh) {
               swipeComplete = dir;
+              otherSwipe = true;
             } else {
               swipeComplete = "";
+              otherSwipe = false;
             }
             if (swipeComplete != "") {
               //pauseRender = true;
@@ -2348,15 +2364,17 @@ bool swipe(std::string dir, int thresh) {
             }
           }
           if (Touch_CTS816.x_point < swipeStartThresh) {
-            otherSwipe = true;
+            //otherSwipe = true;
             activeDir = "right";
           }
         } else if (dir == "left" && (activeDir == "" || activeDir == dir)) {
-          if (otherSwipe) {
+          if (activeDir == "left") {
             if (Touch_CTS816.x_point < 240 - thresh) {
               swipeComplete = dir;
+              otherSwipe = true;
             } else {
               swipeComplete = "";
+              otherSwipe = false;
             }
             if (swipeComplete != "") {
               //pauseRender = true;
@@ -2365,7 +2383,7 @@ bool swipe(std::string dir, int thresh) {
             }
           }
           if (Touch_CTS816.x_point > 240 - swipeStartThresh) {
-            otherSwipe = true;
+            //otherSwipe = true;
             activeDir = "left";
           }
         }
@@ -2465,9 +2483,9 @@ uint16_t findTextColor(const std::string& text) {
       green = max(80, green);
       blue = max(70, blue);
       if (red < 120 && green < 120 && blue < 120) {
-        red = 120;
-        green = 120;
-        blue = 120;
+        red += 120;
+        green += 120;
+        blue += 120;
       }
     }
 
@@ -2773,15 +2791,15 @@ void setup() {
   LCD_1IN28_Init(HORIZONTAL);
   LCD_1IN28_Clear(BLACK);
   DEV_SET_PWM(0);
-  UDOUBLE Imagesize = LCD_1IN28_HEIGHT * LCD_1IN28_WIDTH * 2;//2
+  UDOUBLE Imagesize = LCD_1IN28_HEIGHT * LCD_1IN28_WIDTH * 2;  //2
   //UWORD *BlackImage;
   if ((BlackImage = (UWORD*)malloc(Imagesize)) == NULL) {
     Serial.println("Failed to apply for black memory...");
     exit(0);
   }
   Paint_NewImage((UBYTE*)BlackImage, 240, 240, 0, WHITE);
-   //240 past stopped workin? nope 16 scale @ 480x480 works, almost good, going up to 600 does bad, going down to 400 does bad, 500 has goofy shifts
-  Paint_SetScale(65);//65 Paint_SetPixel (16 needs 960x960,, but... ram issue)
+  //240 past stopped workin? nope 16 scale @ 480x480 works, almost good, going up to 600 does bad, going down to 400 does bad, 500 has goofy shifts
+  Paint_SetScale(65);  //65 Paint_SetPixel (16 needs 960x960,, but... ram issue)
   Paint_SetRotate(ROTATE_0);
   Paint_Clear(WHITE);
   LCD_1IN28_Display(BlackImage);
@@ -2868,14 +2886,15 @@ void setup() {
     int xPos = 0;  //120-(17+17);
     float counter = 0;
     while (int(vel) > 0) {
-      vel = vel / 1.09;
+      vel = vel / 1.1;
       xPos += vel;
-      Paint_DrawRectangle(0, 120, xPos + (17 * 4), 152, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-      Paint_DrawString_EN(xPos + (17 * 0), 120, "W", &Font24, BLACK, 0xfb0c);
-      Paint_DrawString_EN(xPos + (17 * 1), 120, "a", &Font24, BLACK, 0x69bf);
-      Paint_DrawString_EN(xPos + (17 * 2), 120, "r", &Font24, BLACK, 0xf9b8);
-      Paint_DrawString_EN(xPos + (17 * 3), 120, "p", &Font24, BLACK, 0x58df);
-      LCD_1IN28_DisplayWindows(0, 120, xPos + (17 * 4), 150, BlackImage);
+      Paint_DrawRectangle(0, 120, xPos + (17 * 5), 152, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawString_EN(xPos + (17 * 0), 120, "B", &Font24, BLACK, 0xb387);  //brown
+      Paint_DrawString_EN(xPos + (17 * 1), 120, "u", &Font24, BLACK, 0xfbc0);  //ochre (basically just orange now)
+      Paint_DrawString_EN(xPos + (17 * 2), 120, "n", &Font24, BLACK, 0x432c);  //aresnic (basically cyan now)
+      Paint_DrawString_EN(xPos + (17 * 3), 120, "g", &Font24, BLACK, 0xc1c2);  //--dark green-- now rust too
+      Paint_DrawString_EN(xPos + (17 * 4), 120, "l", &Font24, BLACK, 0x0270);  //rust, nope now dark blue
+      LCD_1IN28_DisplayWindows(0, 120, xPos + (17 * 5), 150, BlackImage);
       delay(1);
     }
 
@@ -2885,11 +2904,13 @@ void setup() {
 
     Paint_DrawRectangle(0, 0, 240, 240, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-    xPos = 120 - (17 + 17);
-    Paint_DrawString_EN(xPos + (17 * 0), 120, "W", &Font24, BLACK, 0xfb0c);
-    Paint_DrawString_EN(xPos + (17 * 1), 120, "a", &Font24, BLACK, 0x69bf);
-    Paint_DrawString_EN(xPos + (17 * 2), 120, "r", &Font24, BLACK, 0xf9b8);
-    Paint_DrawString_EN(xPos + (17 * 3), 120, "p", &Font24, BLACK, 0x58df);
+    xPos = 120 - ((17 * 5) / 2);
+    Paint_DrawString_EN(xPos + (17 * 0), 120, "B", &Font24, BLACK, 0xb387);  //0xfb0c
+    Paint_DrawString_EN(xPos + (17 * 1), 120, "u", &Font24, BLACK, 0xfbc0);  //0x69bf
+    Paint_DrawString_EN(xPos + (17 * 2), 120, "n", &Font24, BLACK, 0x432c);  //0xf9b8
+    Paint_DrawString_EN(xPos + (17 * 3), 120, "g", &Font24, BLACK, 0xc1c2);  //0x58df
+    Paint_DrawString_EN(xPos + (17 * 4), 120, "l", &Font24, BLACK, 0x0270);
+
     LCD_1IN28_DisplayWindows(0, 0, 240, 240, BlackImage);
     float loadV = 15;
     int pos = 0;
@@ -2956,7 +2977,7 @@ int timeInTrans = 0;
 bool alreadySet = true;
 
 void loop() {  //bare min
-Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
+  Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
   if (runningAppName == "home") {
     if (millis() - updateHome > 300000) {
       updateHome = millis();
@@ -2967,7 +2988,7 @@ Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLA
   }
   checkNotif();  //Check for incoming data
 
-  Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE); //53
+  Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);  //53
   LCD_1IN28_DisplayWindows(70, 19, 100, 31, BlackImage);
 
   //Do heart rate stuff, and some little battery saver stuff
