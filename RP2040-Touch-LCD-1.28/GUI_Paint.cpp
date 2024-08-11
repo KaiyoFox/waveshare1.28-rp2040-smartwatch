@@ -244,6 +244,7 @@ void Paint_SetRow(UWORD Xpoint, UWORD Ypoint, UWORD Color, int Xend) {
   memcpy(&Paint.Image[Addr], buffer, length);
 }
 
+
 void Paint_SetArea(UWORD Xpoint, UWORD Ypoint, UWORD Color, UWORD Xend, UWORD Yend) {
   if (Xpoint >= Paint.Width || Ypoint >= Paint.Height) {
     //Debug("Exceeding display boundaries\r\n"); //eh
@@ -293,7 +294,7 @@ void Paint_SetArea(UWORD Xpoint, UWORD Ypoint, UWORD Color, UWORD Xend, UWORD Ye
   };
 
   Addr = X * 2 + Y * Paint.WidthByte;
-  int length = (2 * (Xend - Xpoint)) + 1;
+  int length = (2 * (Xend - Xpoint));// + 1
   uint8_t buffer[length];
   for (int i = 0; i < length; i += 2) {
     buffer[i] = pattern[0];
@@ -575,7 +576,7 @@ void Paint_DrawRectangleTrans(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend
 
   if (Draw_Fill) {
     UWORD Ypoint;
-    for (Ypoint = Ystart; Ypoint < Yend; Ypoint++) {
+    for (Ypoint = Ystart; Ypoint < Yend+1; Ypoint++) {
       UWORD Xpoint;
       for (Xpoint = Xstart; Xpoint < Xend; Xpoint++) {
         // Get the color already present at the pixel
@@ -693,14 +694,14 @@ void Paint_DrawRectangle(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
 
   if (Draw_Fill) {
     UWORD Ypoint;
-    
+
     /*
     for (UWORD y = Ystart; y <= Yend; y++) {
       //Paint_DrawHorizontalLine(Xstart, Xend, y, Color);
       //Paint_SetRow(Xstart, y, Color, Xend); //Maybe? better
     }*/
-    
-    
+
+
     Paint_SetArea(Xstart, Ystart, Color, Xend, Yend);
   } else {
     Paint_DrawLine(Xstart, Ystart, Xend, Ystart, Color, Line_width, LINE_STYLE_SOLID);
@@ -795,35 +796,133 @@ void Paint_DrawChar(UWORD Xpoint, UWORD Ypoint, const char Acsii_Char,
                     sFONT* Font, UWORD Color_Foreground, UWORD Color_Background) {
   UWORD Page, Column;
 
-  /*
-    if (Xpoint > Paint.Width || Ypoint > Paint.Height) {
-        Debug("Paint_DrawChar Input exceeds the normal display range\r\n");
-        return;
-    }
-    */
-
   uint32_t Char_Offset = (Acsii_Char - ' ') * Font->Height * ((Font->Width + 7) / 8);
   const unsigned char* ptr = &Font->table[Char_Offset];
 
   for (Page = 0; Page < Font->Height; Page++) {
     const unsigned char* line_ptr = ptr;
-    for (Column = 0; Column < Font->Width; Column++) {
-      if (*line_ptr & (0x80 >> (Column % 8))) {
-        Paint_SetPixel(Xpoint + Column, Ypoint + Page, Color_Foreground);
-      } else if (FONT_BACKGROUND != Color_Background) {
-        Paint_SetPixel(Xpoint + Column, Ypoint + Page, Color_Background);
+    UWORD Xend = Xpoint + Font->Width - 1;
+
+    for (Column = 0; Column < Font->Width; Column += 8) {
+      unsigned char data = *line_ptr++;
+
+      // Skip over 0x00 as it represents no pixels being set
+      if (data == 0x00) {
+        continue;
       }
 
-      if (Column % 8 == 7) {
-        line_ptr++;
+      // Handle common patterns with Paint_SetRow
+      switch (data) {
+          /*
+        //Deburr, basically.
+        case 0x00:  // 00000000
+          // Do nothing
+          break;
+        case 0x01:  // 00000001
+          // Skip rendering for this case
+          break;
+        case 0x02:  // 00000010
+          // Skip rendering for this case
+          break;
+        case 0x04:  // 00000100
+          // Skip rendering for this case
+          break;
+        case 0x08:  // 00001000
+          // Skip rendering for this case
+          break;
+        case 0x10:  // 00010000
+          // Skip rendering for this case
+          break;
+        case 0x20:  // 00100000
+          // Skip rendering for this case
+          break;
+        case 0x40:  // 01000000
+          // Skip rendering for this case
+          break;
+        case 0x80:  // 10000000
+          // Skip rendering for this case
+          break;
+        */
+        case 0x00:  // 00000000
+          // Do nothing
+          break;
+        case 0x01:  // 00000001
+          Paint_SetPixel(Xpoint + Column + 7, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x02:  // 00000010
+          Paint_SetPixel(Xpoint + Column + 6, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x04:  // 00000100
+          Paint_SetPixel(Xpoint + Column + 5, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x08:  // 00001000
+          Paint_SetPixel(Xpoint + Column + 4, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x10:  // 00010000
+          Paint_SetPixel(Xpoint + Column + 3, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x20:  // 00100000
+          Paint_SetPixel(Xpoint + Column + 2, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x40:  // 01000000
+          Paint_SetPixel(Xpoint + Column + 1, Ypoint + Page, Color_Foreground);
+          break;
+        case 0x80:  // 10000000
+          Paint_SetPixel(Xpoint + Column + 0, Ypoint + Page, Color_Foreground);
+          break;
+
+        case 0xF0:  // 11110000 .
+          Paint_SetRow(Xpoint + Column, Ypoint + Page, Color_Foreground, Xpoint + Column + 3);
+          break;
+        case 0x0F:  // 00001111 .
+          Paint_SetRow(Xpoint + Column + 4, Ypoint + Page, Color_Foreground, Xpoint + Column + 7);
+          break;
+        case 0xCC:  // 11001100 .
+          Paint_SetRow(Xpoint + Column, Ypoint + Page, Color_Foreground, Xpoint + Column + 1);
+          Paint_SetRow(Xpoint + Column + 4, Ypoint + Page, Color_Foreground, Xpoint + Column + 5);
+          break;
+        case 0x44:                                                               // 01000100 .
+          Paint_SetPixel(Xpoint + Column + 1, Ypoint + Page, Color_Foreground);  // Single pixel at 1
+          Paint_SetPixel(Xpoint + Column + 5, Ypoint + Page, Color_Foreground);  // Single pixel at 6
+          break;
+        case 0x38:  // 00111000 .
+          Paint_SetRow(Xpoint + Column + 2, Ypoint + Page, Color_Foreground, Xpoint + Column + 4);
+          break;
+        case 0x0E:  // 00001110 .
+          Paint_SetRow(Xpoint + Column + 4, Ypoint + Page, Color_Foreground, Xpoint + Column + 6);
+          break;
+        case 0xC0:  // 11000000 .
+          Paint_SetRow(Xpoint + Column, Ypoint + Page, Color_Foreground, Xpoint + Column + 1);
+          break;
+        case 0x1C:  // 00011100 .
+          Paint_SetRow(Xpoint + Column + 3, Ypoint + Page, Color_Foreground, Xpoint + Column + 5);
+          break;
+        case 0xE0:  // 11100000
+          Paint_SetRow(Xpoint + Column, Ypoint + Page, Color_Foreground, Xpoint + Column + 2);
+          break;
+        case 0x07:  // 00000111
+          Paint_SetRow(Xpoint + Column + 5, Ypoint + Page, Color_Foreground, Xpoint + Column + 7);
+          break;
+        case 0x03:  // 00000011
+          Paint_SetRow(Xpoint + Column + 6, Ypoint + Page, Color_Foreground, Xpoint + Column + 7);
+          break;
+        case 0x3F:  // 00111111
+          Paint_SetRow(Xpoint + Column + 2, Ypoint + Page, Color_Foreground, Xpoint + Column + 7);
+          break;
+        default:
+          for (UWORD bit = 0; bit < 8 && Column + bit < Font->Width; bit++) {
+            if (data & (0x80 >> bit)) {
+              Paint_SetPixel(Xpoint + Column + bit, Ypoint + Page, Color_Foreground);
+            }
+          }
+          break;
       }
-    }
-    if (Font->Width % 8 != 0) {
-      line_ptr++;
     }
     ptr += ((Font->Width + 7) / 8);
   }
 }
+
+
 
 
 /******************************************************************************
@@ -1073,7 +1172,7 @@ void Paint_DrawImage(const unsigned char* image, UWORD xStart, UWORD yStart, UWO
   }
 }
 
-void Paint_DrawImage1(const unsigned char pattern[], UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color_Foreground) { //My normal stuff
+void Paint_DrawImage1(const unsigned char pattern[], UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color_Foreground) {  //My normal stuff
   UWORD X, Y;
   int patternIndex = 0;
 

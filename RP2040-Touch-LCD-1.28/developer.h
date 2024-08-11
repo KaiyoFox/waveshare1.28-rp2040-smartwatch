@@ -48,7 +48,7 @@ void snackBar(std::string, UWORD BGC, UWORD TXCOLOR);
 //Paint_DrawString_EN(X, Y, ANY_VARIABLE->c_str(), &Font16, BACKGROUNDCOLOR, TEXTCOLOR);
 
 int currentPage = 0;  // Added variable to track the current page
-int numberOfPages = 4;
+int numberOfPages = 5;
 
 void developer() {
   Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE); //53
@@ -2781,8 +2781,50 @@ void developer() {
     slider(50, 150, GRAY, PURPLE, "Idk Some ID", 120, 20);
 
     textBox(50, 200, WHITE, RED, "Some ID", 120, 40, "Username", true);
-  }
+  } else if (currentPage == 4){
 
+
+
+// Displaying header 1
+Paint_DrawString_EN(10, 10, "Welcome to My Page", &Font24, 0xFFFF, 0xFFFF);
+
+// Displaying header 2
+Paint_DrawString_EN(10, 46, "Subheading", &Font20, 0x07E0, 0xFFFF);
+
+// Displaying paragraph
+Paint_DrawString_EN(10, 72, "This is a paragraph of text.", &Font16, 0x0000, 0xFFFF);
+
+// Displaying a div with background color
+Paint_DrawRectangle(10, 92, 210, 192, 0xFFE0, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+Paint_DrawRectangleTrans(10, 92, 210, 192, 80, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+// Displaying inline text
+Paint_DrawString_EN(10, 202, "Some inline text.", &Font12, 0xF800, 0xFFFF);
+
+// Displaying list item 1
+Paint_DrawString_EN(112, 202, "Item 1", &Font16, 0xFFFF, 0xFFFF);
+
+// Displaying list item 2
+Paint_DrawString_EN(112, 222, "Item 2", &Font16, 0xFFFF, 0xFFFF);
+
+// Displaying button
+if(button(112, 242, "Click Me!", &Font16, 0xFFFF, 0x001F, 100)) {
+    // Button action here
+}
+
+// Displaying link to https://example.com
+Paint_DrawString_EN(112, 268, "Example Link", &Font16, 0x001F, 0xFFFF);
+
+
+
+
+
+
+
+
+
+
+  }
 
   renderSnack();
   if (inTransition == false) {
