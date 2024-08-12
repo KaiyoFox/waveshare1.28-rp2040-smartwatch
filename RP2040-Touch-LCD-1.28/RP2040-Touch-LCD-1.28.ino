@@ -45,7 +45,8 @@ int FileSysCalculateUsedSpace();
 
 //Builtin-Apps/Processes:
 //include "home.h"
-#include "mainScreen.h"
+#include "watchFaceAnalog.h"
+//#include "watchFaceDigital.h"
 #include "notifPane.h"
 #include "appsPanel.h"
 #include "recentApps.h"
@@ -204,6 +205,7 @@ bool batSaver = false;
 int displayBright = 25;
 std::string leftWidget = "Weather";
 std::string rightWidget = "News";
+std::string watchFace = "watchFaceAnalog";
 
 void clearEEPROM(int addr) {
   EEPROM.begin(512);  // Initialize EEPROM
@@ -844,7 +846,7 @@ std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], 
     }
   }
 
-  if(otherSwipe || activeDir == "up" || activeDir == "down"){
+  if (otherSwipe || activeDir == "up" || activeDir == "down") {
     draggingScrollE = false;
   }
 
@@ -2129,9 +2131,10 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   systemDisplayUpdates = false;  //default for v1 apps
 
   funcER = apps[app];
-  funcER();
 
-  startup = false;
+  //funcER(); //Used to find type of app.
+  typeOfApp = (appsV2.find(app) != appsV2.end());
+
 
   if (typeOfApp == false) {    //v1
     appPermissions = { "*" };  //Unsafe
@@ -2192,6 +2195,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   }
   //Significantly slows down stuff (All transition stuff)
   funcER();
+  startup=false;
   if (dir == "LR") {
     transitionLR(app, start, typeOfApp);
   } else if (dir == "RL") {
@@ -2559,7 +2563,10 @@ void leftWidgetApp() {
     appOut = "";
   }
   AppPtr funcLeft = apps[leftWidget];
+  bool inTranTemp = inTransition;
+  inTransition = true;
   funcLeft();
+  inTransition = inTranTemp;
 
   if (inTransition == false) {
     if (swipe("left", 70)) {
@@ -2573,6 +2580,10 @@ void leftWidgetApp() {
       appOut = "";
       openApp("appsPanel", "RAND", 0);
     }
+
+    if (pauseRender == false) {
+      LCD_1IN28_Display(BlackImage);
+    }
   }
 }
 
@@ -2585,7 +2596,10 @@ void rightWidgetApp() {
     }
   }
   AppPtr funcRight = apps[rightWidget];
+  bool inTranTemp = inTransition;
+  inTransition = true;
   funcRight();
+  inTransition = inTranTemp;
 
   if (inTransition == false) {
     if (swipe("right", 70)) {
@@ -2599,6 +2613,10 @@ void rightWidgetApp() {
       appOut = "";
       openApp("appsPanel", "RAND", 0);
     }
+
+    if (pauseRender == false) {
+      LCD_1IN28_Display(BlackImage);
+    }
   }
 }
 
@@ -2610,104 +2628,42 @@ void homeExec() {
   inTransition = inTranTemp;
 }
 
-void homeExecOld() {
-  //resultButINeedPrivates = DEC_ADC_Read() * (3.3f / (1 << 12) * 2);
-  unsigned long elapsed_time = millis() + CurTime;
-  unsigned long hours = (elapsed_time % 86400000) / 3600000;
-  unsigned long minutes = (elapsed_time % 3600000);
-  unsigned long seconds = (elapsed_time % 60000);
-  unsigned long days = int(elapsed_time / 86400000) / 24;  //um
-  int year, month, day;
-  String dayOfWeek;
-  String monthName;
-  millisToDate(elapsed_time, year, month, day, dayOfWeek, monthName);
-
-  int second_x = 120 - (105 * sin(((seconds / 166.666666666) + 180) * PI / 180));
-  int second_y = 120 + (105 * cos(((seconds / 166.666666666) + 180) * PI / 180));
-
-  if (hours > 12) {
-    hours = hours - 12;
-  }
-  preHours = hours;
-  if (hours == 0) {
-    hours = 12;
-  }
-
-  uint16_t minute_x = 120 + (110 * sin(((minutes / 10000)) * PI / 180));
-  uint16_t minute_y = 120 - (110 * cos(((minutes / 10000)) * PI / 180));
-  //uint16_t minute_x_short = 120 + (90 * sin(((minutes / 10000)) * PI / 180));
-  //uint16_t minute_y_short = 120 - (90 * cos(((minutes / 10000)) * PI / 180));
-
-  //  Paint_DrawLine(minute_x_short, minute_y_short, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_4X4, LINE_STYLE_SOLID);  // Replace 0x009688 with your chosen color
-
-  //Paint_DrawLine(120, 120, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
-
-  //Paint_DrawCircle((uint16_t)minute_x, (uint16_t)minute_y, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
-  //Paint_DrawCircle((uint16_t)minute_x_short, (uint16_t)minute_y_short, 4, WHITE, DOT_PIXEL_4X4, DRAW_FILL_FULL); // Replace 0x009688 with your chosen color
-  //was 4
-
-  uint16_t hour_x = 120 + (60 * sin(((hours % 12) * 30 + 0) * PI / 180));
-  uint16_t hour_y = 120 - (60 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-  //uint16_t hour_x_cent = 120 + (4 * sin(((hours % 12) * 30 + 0) * PI / 180));
-  //uint16_t hour_y_cent = 120 - (4 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-  //uint16_t hour_x_circle = 120 + (59 * sin(((hours % 12) * 30 + 0) * PI / 180));
-  //uint16_t hour_y_circle = 120 - (59 * cos(((hours % 12) * 30 + 0) * PI / 180));
-
-  int weathLen = weatherTemp.length();
-  Paint_DrawImage1(Sun, 120 - 8, 140, 16, 16, YELLOW);
-  Paint_DrawString_EN(120 - ((weathLen * 7) / 2), 156, weatherTemp.c_str(), &Font12, BLACK, GRAY);
-
-  String dateStr = dayOfWeek + ", " + monthName + " " + day;
-  int lengthOfDate = dateStr.length();
-  Paint_DrawString_EN((int)120 - ((lengthOfDate * 11) / 2), 19, dateStr.c_str(), &Font16, BLACK, deviceMainColorTheme);
-
-
-  Paint_DrawLine(120, 120, (uint16_t)hour_x, (uint16_t)hour_y, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);  // Replace 0x00796F with your chosen color
-  Paint_DrawLine(120, 120, (uint16_t)minute_x, (uint16_t)minute_y, deviceSecondColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
-
-  //Paint_DrawCircle((uint16_t)hour_x_circle, (uint16_t)hour_y_circle, 6, 0x009688, DOT_PIXEL_6X6, DRAW_FILL_FULL); // Replace 0x00796F with your chosen color
-  Paint_DrawCircle(120, 120, 3, deviceMainColorTheme, DOT_PIXEL_3X3, DRAW_FILL_FULL);  // Replace 0x00796F with your chosen color
-
-
-
-
-
-  for (int i = 0; i < 12; ++i) {
-    uint16_t hour_x_tic = 120 + (80 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic = 120 - (80 * cos(((i % 12) * 30 + 0) * PI / 180));
-
-    uint16_t hour_x_tic_short = 120 + (75 * sin(((i % 12) * 30 + 0) * PI / 180));
-    uint16_t hour_y_tic_short = 120 - (75 * cos(((i % 12) * 30 + 0) * PI / 180));
-
-    if (i == preHours) {
-      uint16_t hour_x_mark = 120 + (90 * sin(((i % 12) * 30 + 0) * PI / 180));
-      uint16_t hour_y_mark = 120 - (90 * cos(((i % 12) * 30 + 0) * PI / 180));
-      //int lengthOfHr = std::to_string(hours).length();
-      //Paint_DrawString_EN(hour_x_mark - ((lengthOfHr * 14) / 2), hour_y_mark + get_yshift(preHours), std::to_string(hours).c_str(), &Font20, BLACK, deviceMainColorTheme);
-      Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, deviceMainColorTheme, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+void mainFace() {  //complications need adding, and color customization. Complication positions can be set in the app itself in a list "Complications" if its none by default, None are allowed, but if you say 50,50, a 25x25 complication is allowed at 50x50, at which it will be rendered, Complication(std::string complication, int x, int y){} and it will draw a complication there,
+                   //steps, heart rate, weather, day of week, battery, media controls
+  if (appOut != "") {
+    AppPtr toBe = apps[appOut];
+    AppPtr v2 = appV2;
+    if (toBe != v2) {
+      watchFace = appOut;
     } else {
-      Paint_DrawLine(hour_x_tic_short, hour_y_tic_short, (uint16_t)hour_x_tic, (uint16_t)hour_y_tic, GRAY, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+      Serial.println("No v2 apps as watch face");
     }
+    appOut = "";
   }
+  AppPtr funcWatchFace = apps[watchFace];
+  bool inTranTemp = inTransition;
+  inTransition = true;
+  funcWatchFace();
+  inTransition = inTranTemp;
 
-  //was 8
-  //Paint_DrawCircle(second_x, second_y, 7, deviceThirdColorTheme, DOT_PIXEL_2X2, DRAW_FILL_FULL);
+  if (inTransition == false) {
+    if (swipe("right", 70)) {
+      openApp("leftWidget", "LR", Touch_CTS816.x_point);  //Weather
+    } else if (swipe("left", 70)) {
+      openApp("rightWidget", "RL", Touch_CTS816.x_point);  //News
+    } else if (swipe("down", 70)) {
+      openApp("notifPane", "UD", Touch_CTS816.y_point);
+    };
+    if (tapHeld == 15 && !otherSwipe && !miscSwipe) {
+      tap = false;
+      appOut = "";
+      appIn = "watchFace";
+      openApp("appsPanel", "RAND", 0);
+    }
 
-  //  Paint_DrawString_EN(70, 190, (std::to_string(day)).c_str(), &Font16, BLACK, deviceThirdColorTheme);
-
-  //sprintf(buffer, "%02d", days, hours);
-  //Paint_DrawString_EN(100, 131, buffer, &Font24, BLACK, WHITE);
-  //Dates are weird, fix later
-
-  if (elapsed_time - last > 15000) {
-    last = elapsed_time;
-    saveToEEPROMX(last, 1);
-  }
-
-  if (!BLEconnected) {
-    Paint_DrawImage1(NoConnection, 120 - 8, 210, 16, 16, RED);
+    if (pauseRender == false) {
+      LCD_1IN28_Display(BlackImage);
+    }
   }
 }
 
@@ -2816,7 +2772,8 @@ void setup() {
 
   //Apps V1
   apps["home"] = &home;
-  apps["main"] = &mainScreen;
+  apps["main"] = &mainFace;
+  apps["watchFaceAnalog"] = &watchFaceAnalog;
   apps["notifPane"] = &notifPane;
   apps["appsPanel"] = &appsPanel;
   apps["recentApps"] = &recentApps;
@@ -3027,6 +2984,14 @@ void loop() {  //bare min
         last = 0;
       }
     }
+
+    if (!inTransition && !pauseRender) {
+      timeInTrans = millis();
+    } else if (millis() - timeInTrans > 4000) {
+      inTransition = false;
+      pauseRender = false;
+      timeInTrans = millis() + 3000;
+    }
   }
   if (resetTransitionAfterTick) {
     inTransition = false;
@@ -3072,7 +3037,9 @@ void loop() {  //bare min
     tapHeld = 0;
     activeDir = "";
   } else if (sysTap) {
-    tapHeld++;
+    if (!scrolling) {
+      tapHeld++;
+    }
     idleTime = millis();
     ticksSinceTap++;
   }

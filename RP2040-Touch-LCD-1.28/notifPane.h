@@ -30,6 +30,7 @@ std::list<std::list<std::string>> notifications = {
   { "Title", "App", "Content", "AppSpecificData", std::to_string(millis()) },  //(Thee last value is the Time Stamp)
   { "Contact1", "Messages", "SomeContent", "Number", std::to_string(millis()) },
   { "Contact2", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
+  { "Contact2", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
 };
 std::list<std::list<std::string>> uniqueNotifications;
 std::set<std::string> uniqueTitles;
@@ -55,13 +56,13 @@ std::string calculateTimeAgo(const std::string &timestampStr) {
   const long long milliseconds_in_day = 24 * milliseconds_in_hour;
 
   if (diff < milliseconds_in_minute) {
-    return std::to_string(diff / 1000) + "s ago";  // Seconds
+    return std::to_string(diff / 1000) + "s";  // Seconds
   } else if (diff < milliseconds_in_hour) {
-    return std::to_string(diff / milliseconds_in_minute) + "min ago";  // Minutes
+    return std::to_string(diff / milliseconds_in_minute) + "min";  // Minutes
   } else if (diff < milliseconds_in_day) {
-    return std::to_string(diff / milliseconds_in_hour) + "h ago";  // Hours
+    return std::to_string(diff / milliseconds_in_hour) + "h";  // Hours
   } else {
-    return std::to_string(diff / milliseconds_in_day) + "d ago";  // Days
+    return std::to_string(diff / milliseconds_in_day) + "d";  // Days
   }
 }
 
@@ -77,7 +78,7 @@ void notifPane() {
 
   int notifX = 20;
   int notifY = 180;      // Start from bottom and move up
-  int notifHeight = 50;  // Adjusted for larger content area
+  int notifHeight = 56;  // Adjusted for larger content area
   int spacing = 10;
   int index = 0;
 
@@ -97,9 +98,41 @@ void notifPane() {
   for (const auto &notification : uniqueNotifications) {
     int adjustedY = notifY - (index * (notifHeight + spacing)) + scrollY;
 
-    if (!oneTickPause && adjustedY > 0 && adjustedY < 240 - notifHeight) {
+    if (!oneTickPause && adjustedY + notifHeight > 0 && adjustedY < 240) {
       // Drawing the rounded rectangle (reusing from appsPanel)
-      Paint_DrawRectangle(notifX, adjustedY, notifX + 220, adjustedY + notifHeight, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      //Paint_DrawRectangle(notifX, adjustedY, notifX + 220, adjustedY + notifHeight, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+      int x = notifX;
+      int y = adjustedY;
+      Paint_DrawRectangle(x + 23, y + 1, x + 173, y + 3, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 17, y + 3, x + 179, y + 5, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 13, y + 5, x + 183, y + 7, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 9, y + 7, x + 185, y + 9, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 9, y + 9, x + 187, y + 11, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 7, y + 11, x + 189, y + 13, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 5, y + 13, x + 191, y + 15, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 5, y + 15, x + 191, y + 17, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 3, y + 17, x + 193, y + 19, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 3, y + 19, x + 193, y + 21, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 21, x + 193, y + 23, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 23, x + 195, y + 25, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 25, x + 195, y + 27, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 27, x + 195, y + 29, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 29, x + 195, y + 31, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 31, x + 195, y + 33, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 33, x + 195, y + 35, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 1, y + 35, x + 193, y + 37, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 3, y + 37, x + 193, y + 39, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 3, y + 39, x + 193, y + 41, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 3, y + 41, x + 193, y + 43, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 5, y + 43, x + 191, y + 45, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 5, y + 45, x + 189, y + 47, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 7, y + 47, x + 189, y + 49, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 9, y + 49, x + 187, y + 51, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 11, y + 51, x + 185, y + 53, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 13, y + 53, x + 181, y + 55, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+      Paint_DrawRectangle(x + 19, y + 55, x + 177, y + 57, DARKGRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
 
       // Draw the app icon placeholder (red rectangle)
       Paint_DrawRectangle(notifX - 25, adjustedY - 25, notifX + 25, adjustedY + 25, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
@@ -115,7 +148,7 @@ void notifPane() {
       Paint_DrawString_EN(notifX + 150, adjustedY + 5, timeAgo.c_str(), &Font12, DARKGRAY, WHITE);
 
       if (tap && !watchSwipe && !otherSwipe && runningAppName == "notifPane") {
-        if (Touch_CTS816.x_point >= notifX && Touch_CTS816.x_point <= notifX + 220 && Touch_CTS816.y_point >= adjustedY && Touch_CTS816.y_point <= adjustedY + notifHeight) {
+        if (Touch_CTS816.x_point >= notifX && Touch_CTS816.x_point <= notifX + 194 && Touch_CTS816.y_point >= adjustedY && Touch_CTS816.y_point <= adjustedY + notifHeight) {
           tappedNotif = index;
           oneTickPause = true;
           notifHeight = -45;

@@ -17,6 +17,7 @@ extern int scrollY;  // Added scrollY variable
 extern UWORD* BlackImage;
 extern std::string lastUsedAppName;
 extern std::string appOut;
+extern std::string appIn;
 extern std::list<std::string> systemApps;
 typedef void (*AppPtr)();
 extern std::map<std::string, AppPtr> apps;
@@ -44,9 +45,7 @@ void appsPanel() {
   if (startup) {
     openingAnApp = false;
     scrollY = 5;  //spacing;
-
     if (totalHeight == -1) {
-      // Calculate the total height of items and spacing
       totalHeight = 0;
       for (auto const& [key, val] : apps) {
         if (std::find(systemApps.begin(), systemApps.end(), key) == systemApps.end()) {
@@ -56,19 +55,19 @@ void appsPanel() {
     }
   }
 
+  scrollY = std::min(0, std::max(scrollY, -totalHeight)); //note: I need to bring back the smooth slidy thing for over scrolling. or just intentionally properlly implement it,
   int scrollYModded = -scrollY;
-  scrollY = std::min(scrollY, totalHeight + 20);
 
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
 
-  if (lastUsedAppName == "main") {
+  if (lastUsedAppName == "main" && appIn != "watchFace") {
     Paint_DrawString_EN(98, (startY + (0 * (appSize + spacing)) - scrollYModded - 5), "Apps", &Font16, BLACK, WHITE);
   } else {
     Paint_DrawString_EN(65, (startY + (0 * (appSize + spacing)) - scrollYModded - 5), "Select App", &Font16, BLACK, WHITE);
   }
 
   int count = 0;
-  scrollFunctionFull(totalHeight / (appSize + spacing), {}, true);
+  scrollFunctionFull(0, {}, true);  //totalHeight / (appSize + spacing)
   visibleCount = 0;
 
   for (auto it = std::next(apps.begin(), startIndex); it != apps.end(); ++it) {
@@ -113,16 +112,17 @@ void appsPanel() {
             if (tap && !watchSwipe && !otherSwipe && !scrolling) {
               if (tapHeld <= 2) {
                 tap = false;
-                sysTap=false;
+                sysTap = false;
                 tapHeld = 999;
-                if (lastUsedAppName == "main") {
+                if (lastUsedAppName == "main" && appIn != "watchFace") {
                   openApp(key, "", 0);
                 } else {
                   appOut = key;
                   openApp(lastUsedAppName, "", 0);
                 }
+                appIn = "";
                 tap = false;
-                sysTap=false;
+                sysTap = false;
                 openingAnApp = true;
                 oneTickPause = true;
               }
@@ -139,7 +139,7 @@ void appsPanel() {
   //renderSnack();
   if (inTransition == false) {
     if (pauseRender == false && openingAnApp == false) {
-      LCD_1IN28_DisplayWindows(startX - 2, 0, startX+appLeng+4, 240, BlackImage);
+      LCD_1IN28_DisplayWindows(startX - 2, 0, startX + appLeng + 4, 240, BlackImage);
     }
   }
 }

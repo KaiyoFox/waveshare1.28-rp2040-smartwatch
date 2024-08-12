@@ -125,7 +125,7 @@ std::string lastAppOnClose = "";
 void keyboardR() {
   if (startup) {
     startup = false;
-    if (lastAppOnClose != lastUsedAppName && appIn!="customText") {
+    if (lastAppOnClose != lastUsedAppName && appIn != "customText") {
       lastAppOnClose = lastUsedAppName;
       keyboardTyped = "";
       Serial.println("RES");

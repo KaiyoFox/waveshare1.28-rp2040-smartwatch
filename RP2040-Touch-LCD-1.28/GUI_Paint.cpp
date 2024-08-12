@@ -294,7 +294,7 @@ void Paint_SetArea(UWORD Xpoint, UWORD Ypoint, UWORD Color, UWORD Xend, UWORD Ye
   };
 
   Addr = X * 2 + Y * Paint.WidthByte;
-  int length = (2 * (Xend - Xpoint));// + 1
+  int length = (2 * (Xend - Xpoint));  // + 1
   uint8_t buffer[length];
   for (int i = 0; i < length; i += 2) {
     buffer[i] = pattern[0];
@@ -576,7 +576,7 @@ void Paint_DrawRectangleTrans(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend
 
   if (Draw_Fill) {
     UWORD Ypoint;
-    for (Ypoint = Ystart; Ypoint < Yend+1; Ypoint++) {
+    for (Ypoint = Ystart; Ypoint < Yend + 1; Ypoint++) {
       UWORD Xpoint;
       for (Xpoint = Xstart; Xpoint < Xend; Xpoint++) {
         // Get the color already present at the pixel
