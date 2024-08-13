@@ -11,7 +11,7 @@ extern bool watchSwipe;
 extern UWORD *BlackImage;
 extern std::string keyboardData;
 extern std::list<std::string> backgroundApps;
-extern std::list<std::list<std::string>> notifications;
+extern std::list<std::list<std::string>> notifMessages;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
 bool button(int x, int y, const char *text, sFONT *Font, UWORD Color_Foreground, UWORD Color_Background, int size);
@@ -34,7 +34,7 @@ void messages() {
     if (keyboardData != "") {
 
 
-
+/*
       for (const auto &notification : notifications) {
         auto title = notification.front();
         if (uniqueTitles.find(title) == uniqueTitles.end()) {
@@ -42,11 +42,12 @@ void messages() {
           uniqueNotifications.push_back(notification);
         }
       }
+      */
 
       //FIX TAPPED NOTIF IN FUTUREEEE
 
 
-      std::list<std::string> notification = *std::next(uniqueNotifications.begin(), tappedNotif);
+      std::list<std::string> notification = *std::next(notifMessages.begin(), tappedNotif);
       std::string firstItem = notification.front();
       std::string lastItem = notification.back();
 
@@ -71,13 +72,13 @@ void messages() {
       keyboardData = "";
 
       std::list<std::string> newNotification = { firstItem.c_str(), "messages", keyboardTyped, "UserSent" };
-      notifications.push_back(newNotification);  //Yes this is how we keep track of convos
+      notifMessages.push_back(newNotification);  //Yes this is how we keep track of convos
     }
   }
-  if (tappedNotif >= notifications.size()) {
+  if (tappedNotif >= notifMessages.size()) {
     tappedNotif = -1;
   }
-  if (notifications.size() < 0) {
+  if (notifMessages.size() < 0) {
     tappedNotif = -1;
   }
   if (tappedNotif == -1) {  // && tappedPhoneNumber == ""
@@ -100,24 +101,24 @@ void messages() {
         auto targetFirstTwoItems = std::list<std::string>{ contact.back().c_str(), "Messages" };
         int currentIndex = 0;
         int foundIndex = -1;
-        for (const auto &notification : notifications) {
+        for (const auto &notification : notifMessages) {
           if (std::equal(targetFirstTwoItems.begin(), targetFirstTwoItems.end(), notification.begin())) {
             containsNotification = true;
             break;
           }
         }
         if (containsNotification == false) {
-          notifications.push_back({ contact.back().c_str(), "Messages", "", contact.front().c_str() });
+          notifMessages.push_back({ contact.back().c_str(), "Messages", "", contact.front().c_str() });
         }
-        for (const auto &notification : notifications) {
+        for (const auto &notification : notifMessages) {
           auto title = notification.front();
           if (uniqueTitles.find(title) == uniqueTitles.end()) {
             uniqueTitles.insert(title);
-            uniqueNotifications.push_back(notification);
+            notifMessages.push_back(notification);
           }
         }
         currentIndex = 0;
-        for (const auto &notification : uniqueNotifications) {
+        for (const auto &notification : notifMessages) {
           //if (notification == targetNotification) {
           if (std::equal(targetFirstTwoItems.begin(), targetFirstTwoItems.end(), notification.begin())) {
             foundIndex = currentIndex;
@@ -133,15 +134,15 @@ void messages() {
   } else {
 
 
-    for (const auto &notification : notifications) {
+    for (const auto &notification : notifMessages) {
       auto title = notification.front();
       if (uniqueTitles.find(title) == uniqueTitles.end()) {
         uniqueTitles.insert(title);
-        uniqueNotifications.push_back(notification);
+        notifMessages.push_back(notification);
       }
     }
 
-    std::list<std::string> selectedNotification = *std::next(uniqueNotifications.begin(), tappedNotif);
+    std::list<std::string> selectedNotification = *std::next(notifMessages.begin(), tappedNotif);
     std::string selectedTitle;
 
     if (!selectedNotification.empty()) {
@@ -155,12 +156,12 @@ void messages() {
 
     int lineHeight = 18;
 
-    int totalTextHeight = notifications.size() * lineHeight;
+    int totalTextHeight = notifMessages.size() * lineHeight;
     int scrollOffset = 0;  //(totalTextHeight - 190);//(totalTextHeight > 190) ? (totalTextHeight - 190) : 0;
 
     notifPreviewY = 190 - lineHeight;  // Start rendering from the bottom of the display
 
-    for (auto notificationIter = notifications.rbegin(); notificationIter != notifications.rend(); ++notificationIter) {
+    for (auto notificationIter = notifMessages.rbegin(); notificationIter != notifMessages.rend(); ++notificationIter) {
       const auto &notification = *notificationIter;
 
       if (!notification.empty() && notification.front() == selectedTitle) {

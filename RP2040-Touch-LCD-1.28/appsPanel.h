@@ -55,7 +55,7 @@ void appsPanel() {
     }
   }
 
-  scrollY = std::min(0, std::max(scrollY, -totalHeight)); //note: I need to bring back the smooth slidy thing for over scrolling. or just intentionally properlly implement it,
+  scrollY = std::min(0, std::max(scrollY, -totalHeight));  //note: I need to bring back the smooth slidy thing for over scrolling. or just intentionally properlly implement it,
   int scrollYModded = -scrollY;
 
   int startIndex = std::max(0, (scrollYModded / (appSize + spacing)) - visibleApps);
@@ -138,6 +138,9 @@ void appsPanel() {
 
   //renderSnack();
   if (inTransition == false) {
+    if (swipe("down", 70)) {
+      openApp("main", "UD", Touch_CTS816.y_point);
+    }
     if (pauseRender == false && openingAnApp == false) {
       LCD_1IN28_DisplayWindows(startX - 2, 0, startX + appLeng + 4, 240, BlackImage);
     }

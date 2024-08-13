@@ -130,6 +130,19 @@ std::list<float> batVoltages = {};
 std::map<std::list<std::string>, int> specialButtons = {};                    //{"APP","ID", "TYPE"}: VALUE
 std::map<std::list<std::string>, std::list<float>> specialButtonsExtra = {};  //{"APP","ID", "TYPE"}: {EXTRA}
 std::map<std::list<std::string>, std::string> specialButtonsExtraString = {};
+
+std::list<std::list<std::string>> notifications = {
+  { "Title", "App", "Content", "AppSpecificData", std::to_string(millis()) },  //(Thee last value is the Time Stamp)
+  { "Person", "Messages", "SomeContent", "Number", std::to_string(millis()) },
+  { "SOMEGUY", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
+  { "SOMEGUY", "Messages", "Pog", "Number", std::to_string(millis()) },
+};
+std::list<std::list<std::string>> notifMessages = {
+  { "PHONENUMBER", "Messages", "SomeContent", "Number", std::to_string(millis()) },
+  { "PHONENUMBER", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
+  { "PHONENUMBER2", "Messages", "Pog", "Number", std::to_string(millis()) },
+};
+
 int autoClock = 15000;  //Auto clock screen
 std::string error = "";
 std::string swipeComplete = "";
@@ -1175,7 +1188,14 @@ void checkNotif() {
           }
           Serial.println(removeQuotes(JSON.stringify(myObject["app"])).c_str());
 
-          notifications.push_back({ phoneNumber, "Messages", content, foundContactName });
+
+          std::list<std::string> notifToAdd = { phoneNumber, "Messages", content, foundContactName, std::to_string(millis()) };
+          auto messageNotifExists = std::find(notifMessages.begin(), notifMessages.end(), notifToAdd);
+          if(messageNotifExists!=notifMessages.end()){ //ALSO THIS WILL NEVER BE TRUE, BECAUSE TIME STAMPS ALWAYS CHANGE, (JUST CHECK IF THE PHONE NUMBER IN MESSAGES ALREADY EXISTS)
+            notifications.erase(notifToAdd); //or .remove(2);  
+          }
+          notifications.push_back(notifToAdd);
+          notifMessages.push_back(notifToAdd);
 
           lastfpstick = millis();
           digitalWrite(D28, HIGH);
