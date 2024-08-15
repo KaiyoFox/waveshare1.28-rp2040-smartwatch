@@ -69,7 +69,7 @@ int FileSysCalculateUsedSpace();
 #include "weather.h"
 #include "news.h"
 #include "findMyPhone.h"
-#include "alarms.h"
+#include "alarm.h"
 
 //Apps V2
 #include "appVersTwo.h"
@@ -81,7 +81,7 @@ const int PulseWire = 27;           // PulseSensor PURPLE WIRE connected to ANAL
 int Threshold = 550;                //3000;               //510;                //550           // Determine which Signal to "count as a beat" and which to ignore.
 PulseSensorPlayground pulseSensor;  // Creates an instance of the PulseSensorPlayground object called "pulseSensor"
 int address = 1;
-int CurTime;
+unsigned long int CurTime;
 int last = 0;
 int last2 = 0;
 int ticksSinceTap = 0;
@@ -107,7 +107,7 @@ int updateHome = 0;
 int idleTime = millis();
 int lastBatteryCheck = 0;
 int frameCount = 0;
-int fps = 0;
+int fps = 60;
 int lastfpstick = 0;
 bool oneTickPause = false;
 bool miscSwipe = true;
@@ -141,6 +141,9 @@ std::list<std::list<std::string>> notifMessages = {
   { "PHONENUMBER", "Messages", "SomeContent", "Number", std::to_string(millis()) },
   { "PHONENUMBER", "Messages", "CONTENT2", "Number", std::to_string(millis()) },
   { "PHONENUMBER2", "Messages", "Pog", "Number", std::to_string(millis()) },
+};
+std::list<std::list<long unsigned int>> systemAlarms = {
+  { (long unsigned int)millis() + 60000, 0, 0 }  //time, dismissed, enabled
 };
 
 int autoClock = 15000;  //Auto clock screen
@@ -1191,8 +1194,8 @@ void checkNotif() {
 
           std::list<std::string> notifToAdd = { phoneNumber, "Messages", content, foundContactName, std::to_string(millis()) };
           auto messageNotifExists = std::find(notifMessages.begin(), notifMessages.end(), notifToAdd);
-          if(messageNotifExists!=notifMessages.end()){ //ALSO THIS WILL NEVER BE TRUE, BECAUSE TIME STAMPS ALWAYS CHANGE, (JUST CHECK IF THE PHONE NUMBER IN MESSAGES ALREADY EXISTS)
-            notifications.erase(notifToAdd); //or .remove(2);  
+          if (messageNotifExists != notifMessages.end()) {  //ALSO THIS WILL NEVER BE TRUE, BECAUSE TIME STAMPS ALWAYS CHANGE, (JUST CHECK IF THE PHONE NUMBER IN MESSAGES ALREADY EXISTS)
+            notifications.remove(notifToAdd);               //or .erase(2);
           }
           notifications.push_back(notifToAdd);
           notifMessages.push_back(notifToAdd);
@@ -2215,7 +2218,7 @@ void openApp(std::string app, std::string dir = "", int start = -1) {
   }
   //Significantly slows down stuff (All transition stuff)
   funcER();
-  startup=false;
+  startup = false;
   if (dir == "LR") {
     transitionLR(app, start, typeOfApp);
   } else if (dir == "RL") {
@@ -2816,7 +2819,7 @@ void setup() {
   apps["Weather"] = &weather;
   apps["News"] = &news;
   apps["FindMyPhone"] = &findMyPhone;
-  apps["Alarms"] = &alarms;
+  apps["Alarms"] = &alarm;
 
   //Apps V2
   apps["appVersTwo"] = &appV2;
@@ -2953,7 +2956,129 @@ int shouldConsiderUpdating = 0;
 int timeInTrans = 0;
 bool alreadySet = true;
 
-void loop() {  //bare min
+
+
+
+
+
+
+
+
+
+void checkAlarmsAndNotify() {
+  unsigned long currentTime = millis();  // + CurTime; //TEMP FORGET CurTime ,,,cuz yeah
+  int currentHours, currentMinutes;
+  millisToHoursMinutes(currentTime, currentHours, currentMinutes);
+
+  for (auto it = systemAlarms.begin(); it != systemAlarms.end(); ++it) {
+    int alarmTime = (*it).front();
+    int dismissed = *std::next(it->begin(), 1);
+    int enabled = *std::next(it->begin(), 2);
+
+    if (enabled == 0) continue;  // Skip if the alarm is not enabled
+
+    int alarmHours, alarmMinutes;
+    millisToHoursMinutes(alarmTime, alarmHours, alarmMinutes);
+
+    int currentTimeInMinutes = currentHours * 60 + currentMinutes;
+    int alarmTimeInMinutes = alarmHours * 60 + alarmMinutes;
+    int timeDifference = alarmTimeInMinutes - currentTimeInMinutes;
+
+    std::string notificationMessage = "Alarm in 30 minutes: " + formatTime(alarmHours, alarmMinutes);
+    std::string alarmMessage = "Alarm Ringing: " + formatTime(alarmHours, alarmMinutes);
+
+    // 30-minute pre-notification
+    if (timeDifference <= 30 && timeDifference > 1 && dismissed == 0) {
+      bool notificationExists = false;
+      for (const auto& notif : notifications) {
+        auto notifIt = notif.begin();
+        std::advance(notifIt, 2);  // Move to the third element
+        if (*notifIt == notificationMessage) {
+          notificationExists = true;
+          break;
+        }
+      }
+      if (!notificationExists) {
+        notifications.push_back({ "Alarm Soon", "Alarms", notificationMessage, std::to_string(alarmTime), std::to_string(millis()) });
+      }
+    }
+    // Alarm ringing
+    else if (timeDifference >= -1 && timeDifference <= 4 && dismissed == 0) {
+      for (auto notifIt = notifications.begin(); notifIt != notifications.end(); ++notifIt) {
+        if (notifIt->front() == "Alarm Soon") {
+          notifications.erase(notifIt);
+          break;
+        }
+      }
+
+      bool notificationExists = false;
+      for (const auto& notif : notifications) {
+        auto notifIt = notif.begin();
+        std::advance(notifIt, 2);        // Move to the third element
+        if (*notifIt == alarmMessage) {  // Check if the ringing notification already exists
+          notificationExists = true;
+          break;
+        }
+      }
+
+      if (!notificationExists) {
+        removeNotificationByAppData(std::to_string(alarmTime));
+        notifications.push_back({ "Alarm Ringing", "Alarms", alarmMessage, std::to_string(alarmTime), std::to_string(millis()) });
+      }
+
+      digitalWrite(D28, HIGH);  // Turn on the haptic motor
+    }
+    // Post-alarm (missed alarm notification)
+    else if (timeDifference < -1 && dismissed == 0) {
+      digitalWrite(D28, LOW);  // Turn off the haptic motor
+
+      bool missedNotificationExists = false;
+      std::string missedAlarmMessage = "Missed: " + formatTime(alarmHours, alarmMinutes);
+      for (const auto& notif : notifications) {
+        auto notifIt = notif.begin();
+        std::advance(notifIt, 2);              // Move to the third element
+        if (*notifIt == missedAlarmMessage) {  // Check if the missed alarm notification already exists
+          missedNotificationExists = true;
+          break;
+        }
+      }
+
+      if (!missedNotificationExists) {
+        removeNotificationByAppData(std::to_string(alarmTime));
+        notifications.push_back({ "Missed Alarm", "Alarms", missedAlarmMessage, std::to_string(alarmTime), std::to_string(millis()) });
+        *std::next(it->begin(), 1) = 1;  // Mark alarm as dismissed
+      }
+    } else {
+      digitalWrite(D28, LOW);  // Turn off the haptic motor if no alarms are ringing
+    }
+  }
+}
+
+
+void removeNotificationByAppData(const std::string& appData) {
+  for (auto notifIt = notifications.begin(); notifIt != notifications.end();) {
+    auto appDataIt = std::next(notifIt->begin(), 3);  // Move to the fourth element (appData)
+    if (*appDataIt == appData) {
+      notifIt = notifications.erase(notifIt);
+    } else {
+      ++notifIt;
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+void loop() {                                             //bare min
+  delay(max(0, min(10, ((1 / 60) - (1 / fps)) * 1000)));  //try to limit fps,,, because sometimes its too high and the display has a moment...
   Paint_DrawString_EN(70, 19, (std::to_string(fps) + " FPS").c_str(), &Font12, BLACK, BLUE);
   if (runningAppName == "home") {
     if (millis() - updateHome > 300000) {
@@ -2972,10 +3097,12 @@ void loop() {  //bare min
 
   frameCount++;
   oneTickPause = false;
-  if (millis() - lastfpstick >= 3000) {
+  if (millis() - lastfpstick >= 2000) {
     lastfpstick = millis();
-    fps = (int)frameCount / 3;
+    fps = (int)frameCount / 2;
     frameCount = 0;
+
+    checkAlarmsAndNotify();
 
     if (runningAppName == "home") {  //Lower Clock
       if (!aod) {

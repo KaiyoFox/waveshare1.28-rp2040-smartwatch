@@ -12,7 +12,7 @@ extern std::string weatherDesc;
 extern uint16_t deviceMainColorTheme;
 extern uint16_t deviceSecondColorTheme;
 extern uint16_t deviceThirdColorTheme;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern UWORD *BlackImage;
 extern const char *message;
 extern std::list<std::string> backgroundApps;

@@ -3,7 +3,6 @@
 extern bool inTransition;
 extern bool pauseRender;
 extern bool tap;
-extern int CurTime;
 extern UWORD *BlackImage;
 extern std::list<std::string> backgroundApps;
 bool swipe(std::string dir, int thresh);

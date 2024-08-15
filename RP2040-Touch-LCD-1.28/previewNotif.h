@@ -3,7 +3,7 @@
 extern bool inTransition;
 extern bool pauseRender;
 extern bool tap;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern int tappedNotif;
 extern UWORD *BlackImage;
 extern std::list<std::string> backgroundApps;

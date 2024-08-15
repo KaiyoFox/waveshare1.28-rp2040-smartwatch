@@ -1,7 +1,7 @@
 #include <string>
 #ifndef watchFaceAnalog_H
 #define watchFaceAnalog_H
-extern int CurTime;
+extern unsigned long int CurTime;
 extern int last;
 extern int tapHeld;
 extern int HourMinSize;

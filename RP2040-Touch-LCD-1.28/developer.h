@@ -1,7 +1,7 @@
 #ifndef developer_H
 #define developer_H
 extern int address;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern int last;
 extern int last2;
 extern int ticksSinceTap;

@@ -14,6 +14,7 @@ extern UWORD *BlackImage;
 typedef void (*AppPtr)();
 extern std::map<std::string, AppPtr> apps;
 extern std::list<float> batVoltages;
+extern std::string appIn;
 bool swipe(std::string dir, int thresh);
 void openApp(std::string app, std::string dir, int start);
 std::list<int> scrollFunctionFull(int numberOfItems, std::string itemHeaders[], bool visible);
@@ -142,6 +143,8 @@ void notifPane() {
           notifHeight = -45;
           auto it = apps.find(*std::next(notification.begin(), 1));  // Open the app associated with the notification
           if (it != apps.end()) {
+            std::string itIn = *std::next(notification.begin(), 3);
+            appIn=itIn;
             openApp(it->first, "RL", 240);
           } else {
             openApp("previewNotif", "RL", 240);

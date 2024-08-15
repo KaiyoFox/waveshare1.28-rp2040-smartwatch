@@ -4,7 +4,7 @@ extern bool inTransition;
 extern bool pauseRender;
 extern bool tap;
 extern bool startup;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern int tappedNotif;
 extern bool otherSwipe;
 extern bool watchSwipe;

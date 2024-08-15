@@ -5,7 +5,7 @@ extern bool inTransition;
 extern bool pauseRender;
 extern bool tap;
 extern int tapHeld;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern UWORD* BlackImage;
 extern std::list<std::string> backgroundApps;
 extern std::string keyboardData;   //Occurs when Enter Pressed

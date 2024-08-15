@@ -4,7 +4,7 @@ extern bool inTransition;
 extern bool pauseRender;
 extern bool tap;
 extern bool watchSwipe;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern UWORD *BlackImage;
 extern std::list<std::string> backgroundApps;
 bool swipe(std::string dir, int thresh);

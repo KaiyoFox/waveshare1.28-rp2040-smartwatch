@@ -5,7 +5,7 @@ extern bool pauseRender;
 extern bool startup;
 extern bool speedMode;
 extern bool tap;
-extern int CurTime;
+extern unsigned long int CurTime;
 extern int BPM;
 extern int stepCount;
 extern UWORD *BlackImage;

@@ -6,7 +6,7 @@ extern bool tap;
 extern bool startup;
 extern std::string weatherTemp;  //usually Farenheit but will have a C at the end if it is Celcius
 extern std::string weatherDesc;  //if either value is Unkown, then.. its uknown and didn't fetch.
-extern int CurTime;
+extern unsigned long int CurTime;
 extern UWORD* BlackImage;
 extern std::list<std::string> backgroundApps;
 typedef void (*ServiceFunction)();
